@@ -1,0 +1,2119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Quiz Quest 3D — Cel-Shaded Edition</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#000;
+    font-family:'Segoe UI', 'Trebuchet MS', Arial, sans-serif; }
+  #game { width:100%; height:100%; display:block; cursor:crosshair; }
+
+  /* ---------- HUD ---------- */
+  #hud { position:fixed; inset:0; pointer-events:none; z-index:10; }
+  .hudPanel { background:rgba(12,18,30,0.72); border:2px solid rgba(255,255,255,0.18);
+    border-radius:12px; padding:8px 14px; color:#fff; backdrop-filter:blur(3px); }
+  #hearts { position:fixed; left:18px; bottom:18px; font-size:30px; letter-spacing:4px; }
+  .heartOn  { color:#ff4d6d; text-shadow:0 0 8px rgba(255,77,109,.8); }
+  .heartOff { color:rgba(255,255,255,0.22); }
+  #scoreBox { position:fixed; right:18px; top:16px; text-align:right; }
+  #score { font-size:26px; font-weight:800; color:#ffd766; }
+  #scoreLbl { font-size:11px; opacity:.75; letter-spacing:2px; }
+  #levelBox { position:fixed; left:18px; top:16px; }
+  #minimap { position:fixed; left:18px; top:104px; border-radius:10px;
+    border:2px solid rgba(255,255,255,0.22); background:rgba(10,14,24,0.78); }
+  .modeBtn.sel { border-color:#ffd766 !important; color:#ffd766 !important; box-shadow:0 0 10px rgba(255,215,102,.35); }
+  #levelName { font-size:17px; font-weight:700; }
+  #levelStd { font-size:11px; opacity:.78; margin-top:2px; max-width:280px; }
+  #musicBtn { position:fixed; right:18px; top:74px; z-index:30; padding:6px 12px; border-radius:10px;
+    background:rgba(12,18,30,0.72); border:2px solid rgba(255,255,255,0.25); color:#fff;
+    font-size:13px; font-weight:800; cursor:pointer; pointer-events:auto; font-family:inherit; }
+  body.touch #musicBtn { right:86px; top:84px; }
+  #crosshair { position:fixed; left:50%; top:50%; width:8px; height:8px; margin:-4px 0 0 -4px;
+    border-radius:50%; background:rgba(255,255,255,0.85); box-shadow:0 0 6px rgba(0,0,0,.6); }
+  #hint { position:fixed; left:50%; bottom:90px; transform:translateX(-50%);
+    font-size:16px; font-weight:700; color:#fff; background:rgba(20,30,50,.8);
+    border:2px solid #7ec8ff; border-radius:10px; padding:7px 18px; display:none; }
+  #toasts { position:fixed; top:80px; left:50%; transform:translateX(-50%);
+    display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .toast { background:rgba(15,25,40,.88); color:#fff; font-weight:700; font-size:16px;
+    border-radius:10px; padding:8px 20px; border:2px solid rgba(255,255,255,.25);
+    animation:toastIn .25s ease-out; }
+  .toast.gold { border-color:#ffd766; color:#ffd766; }
+  .toast.good { border-color:#7dff9b; color:#7dff9b; }
+  .toast.bad  { border-color:#ff6b6b; color:#ff6b6b; }
+  @keyframes toastIn { from { opacity:0; transform:translateY(-12px);} to {opacity:1; transform:none;} }
+
+  /* ---------- Quiz modal ---------- */
+  #quizWrap { position:fixed; inset:0; z-index:40; display:none; align-items:center; justify-content:center;
+    background:rgba(8,12,22,0.62); }
+  #quiz { width:min(680px, 92vw); max-height:88vh; overflow-y:auto; background:#101a2c;
+    border:3px solid #4f8fde; border-radius:18px; padding:26px 30px; color:#fff;
+    box-shadow:0 18px 60px rgba(0,0,0,.6); }
+  #quizTag { display:inline-block; font-size:11px; font-weight:800; letter-spacing:2px;
+    background:#4f8fde; color:#fff; border-radius:6px; padding:3px 10px; margin-bottom:12px; }
+  #quizPassage { background:#1a2740; border-left:4px solid #ffd766; border-radius:8px;
+    padding:14px 16px; font-size:15px; line-height:1.65; margin-bottom:16px; display:none;
+    font-family:Georgia, 'Times New Roman', serif; }
+  #quizQ { font-size:20px; font-weight:700; line-height:1.45; margin-bottom:18px; }
+  .ansBtn { display:block; width:100%; text-align:left; margin-bottom:10px; padding:13px 16px;
+    background:#1c2a45; color:#fff; border:2px solid #33507f; border-radius:10px;
+    font-size:16px; font-weight:600; cursor:pointer; transition:all .12s; font-family:inherit; }
+  .ansBtn:hover { background:#27395e; border-color:#5d8fd6; }
+  .ansBtn.correct { background:#14532d; border-color:#39d97a; }
+  .ansBtn.wrong { background:#5b1a24; border-color:#ff5d6d; }
+  .ansBtn:disabled { cursor:default; }
+  #quizFeedback { min-height:26px; margin-top:6px; font-size:17px; font-weight:800; }
+  .key { display:inline-block; background:#2a3a5c; border:1px solid #51719f; border-radius:5px;
+    padding:0 7px; font-size:13px; margin-right:6px; }
+
+  /* ---------- Full-screen overlays ---------- */
+  .overlay { position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center;
+    background:radial-gradient(ellipse at center, #16243f 0%, #080d18 75%); color:#fff; text-align:center; }
+  .overlay.show { display:flex; }
+  .ovInner { max-width:720px; padding:30px; max-height:94vh; overflow-y:auto; }
+  .ovTitle { font-size:44px; font-weight:900; letter-spacing:1px;
+    background:linear-gradient(180deg,#ffe9a3,#ffb74d); -webkit-background-clip:text;
+    background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:6px; }
+  .ovSub { font-size:17px; opacity:.85; margin-bottom:22px; }
+  .bigBtn { background:linear-gradient(180deg,#56a8ff,#2f6fd6); border:none; color:#fff;
+    font-size:20px; font-weight:800; border-radius:12px; padding:14px 42px; cursor:pointer;
+    box-shadow:0 6px 18px rgba(47,111,214,.45); margin:8px; font-family:inherit; }
+  .bigBtn:hover { filter:brightness(1.12); }
+  .lvlBtn { background:#1c2a45; border:2px solid #33507f; color:#cfe2ff; font-size:14px; font-weight:700;
+    border-radius:10px; padding:9px 14px; cursor:pointer; margin:4px; font-family:inherit; }
+  .lvlBtn:hover { border-color:#7ec8ff; background:#27395e; }
+  .nameInput { background:#1c2a45; border:2px solid #33507f; color:#fff; font-size:16px; font-weight:600;
+    border-radius:10px; padding:11px 14px; margin:4px; width:230px; text-align:center;
+    font-family:inherit; outline:none; }
+  .nameInput:focus { border-color:#7ec8ff; }
+  .nameInput::placeholder { color:rgba(255,255,255,.4); }
+  .instr { text-align:left; display:inline-block; background:rgba(255,255,255,.06);
+    border-radius:12px; padding:16px 22px; font-size:15px; line-height:1.9; margin-bottom:18px; }
+  #fadeWhite { position:fixed; inset:0; background:#fff; opacity:0; pointer-events:none; z-index:60;
+    transition:opacity 1.1s ease; }
+  #statGrid { display:flex; gap:18px; justify-content:center; margin:18px 0 24px; flex-wrap:wrap; }
+  .statCard { background:rgba(255,255,255,.07); border-radius:12px; padding:14px 24px; min-width:130px; }
+  .statNum { font-size:30px; font-weight:900; color:#ffd766; }
+  .statLbl { font-size:12px; opacity:.8; letter-spacing:1px; }
+  .statSub { font-size:13px; opacity:.75; margin-top:3px; }
+  .statBar { height:7px; border-radius:4px; background:rgba(255,255,255,.12); margin-top:8px; overflow:hidden; }
+  .statBar > div { height:100%; border-radius:4px; background:linear-gradient(90deg,#56a8ff,#7dff9b); }
+  #pauseOverlay { background:rgba(8,12,22,.78); }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud">
+  <div id="levelBox" class="hudPanel"><div id="levelName"></div><div id="levelStd"></div></div>
+  <canvas id="minimap" width="207" height="135"></canvas>
+  <div id="bossBox" class="hudPanel" style="position:fixed; top:16px; left:50%; transform:translateX(-50%); display:none; font-weight:800; font-size:16px;"></div>
+  <div id="scoreBox" class="hudPanel"><div id="scoreLbl">SCORE</div><div id="score">0</div></div>
+  <div id="hearts" class="hudPanel"></div>
+  <div id="ammoBox" class="hudPanel" style="position:fixed; right:18px; bottom:18px; display:none; font-size:17px; font-weight:800; color:#ffd766; border-color:#ffd766;"></div>
+  <button id="musicBtn" title="Toggle music">&#9835; ON</button>
+  <div id="crosshair"></div>
+  <div id="hint"></div>
+  <div id="toasts"></div>
+</div>
+
+<div id="quizWrap">
+  <div id="quiz">
+    <span id="quizTag"></span>
+    <div id="quizPassage"></div>
+    <div id="quizQ"></div>
+    <div id="quizAnswers"></div>
+    <div id="quizFeedback"></div>
+  </div>
+</div>
+
+<div id="startOverlay" class="overlay show">
+  <div class="ovInner">
+    <div class="ovTitle">QUIZ QUEST 3D</div>
+    <div class="ovSub">Cel-Shaded Edition &mdash; explore 5 biomes, outsmart the Quizlings!</div>
+    <div class="instr">
+      <span class="key">W A S D</span> or <span class="key">&#8593;&#8595;</span> move &nbsp;&bull;&nbsp; <span class="key">Mouse</span> or <span class="key">&#8592;&#8594;</span> look around &nbsp;&bull;&nbsp; <span class="key">SHIFT</span>+<span class="key">&#8592;&#8594;</span> strafe<br>
+      <span class="key">SPACE</span> open &amp; close sliding doors (some walls hide secrets&hellip;)<br>
+      <b>Quizlings</b> toss question balls at you &mdash; answer correctly to GRAB the ball,<br>
+      then press <span class="key">Z</span> to throw it back! Hit a Quizling and it catches the ball and vanishes.<br>
+      Collect <b>school supplies</b> for points. Find <b>red apples</b> in secret rooms for extra chances.<br>
+      Step on <b>glowing pads</b> to save your spot. The exit portal only unlocks after you catch <b>3 Quizlings</b>!<br>
+      Clear all 5 biomes to reach the <b>Final Floor</b> &mdash; THE QUIZZARD takes 3 hits, and his balls can&#700;t be absorbed!
+    </div><br>
+    <div style="margin-bottom:14px;">
+      <input id="playerName" class="nameInput" placeholder="Your name" maxlength="30" autocomplete="off">
+      <input id="playerClass" class="nameInput" placeholder="Your class (e.g., 4B)" maxlength="12" autocomplete="off">
+    </div>
+    <div style="font-size:14px; opacity:.85; margin-bottom:6px;">Choose your challenge:</div>
+    <div style="margin-bottom:10px;">
+      <button class="lvlBtn modeBtn sel" id="modeEasy">&#128506; Easy — full map shown</button>
+      <button class="lvlBtn modeBtn" id="modeHard">&#129517; Hard — map reveals as you explore</button>
+    </div>
+    <button class="bigBtn" id="startBtn">&#9654; Start Adventure</button>
+    <div id="loginMsg" style="margin-top:8px; font-size:14px; font-weight:700; color:#ff8a8a; min-height:20px;"></div>
+  </div>
+</div>
+
+<div id="levelDoneOverlay" class="overlay">
+  <div class="ovInner">
+    <div class="ovTitle" id="ldTitle">BIOME CLEARED!</div>
+    <div class="ovSub" id="ldSub"></div>
+    <div id="statGrid"></div>
+    <button class="bigBtn" id="nextLvlBtn">Next Biome &#9654;</button>
+  </div>
+</div>
+
+<div id="winOverlay" class="overlay">
+  <div class="ovInner">
+    <div class="ovTitle">&#127942; QUEST COMPLETE!</div>
+    <div class="ovSub">You conquered all five biomes AND defeated THE QUIZZARD. Your brain is officially mighty.</div>
+    <div id="winStats"></div>
+    <button class="bigBtn" onclick="location.reload()">Play Again</button>
+  </div>
+</div>
+
+<div id="pauseOverlay" class="overlay">
+  <div class="ovInner">
+    <div class="ovTitle" style="font-size:34px;">PAUSED</div>
+    <div class="ovSub">Click below to keep exploring</div>
+    <button class="bigBtn" id="resumeBtn">Resume</button>
+  </div>
+</div>
+
+<div id="fadeWhite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<!-- sql.js loads lazily from CDN when DB is available -->
+<script>
+'use strict';
+
+/* =========================================================
+   CEL-SHADING (Breath of the Wild inspired)
+   MeshToonMaterial + 4-band quantised gradient
+   ========================================================= */
+let TOON_GRADIENT = null;
+function initToonGradient(){
+  const steps = 4;
+  const cv = document.createElement('canvas'); cv.width = steps; cv.height = 1;
+  const ctx = cv.getContext('2d');
+  // 4 hard bands: shadow / mid-shadow / mid-light / highlight
+  const vals = [30, 100, 190, 245];
+  vals.forEach((v,i)=>{ ctx.fillStyle=`rgb(${v},${v},${v})`; ctx.fillRect(i,0,1,1); });
+  TOON_GRADIENT = new THREE.CanvasTexture(cv);
+  TOON_GRADIENT.magFilter = THREE.NearestFilter;
+  TOON_GRADIENT.minFilter = THREE.NearestFilter;
+}
+
+/* =========================================================
+   SPRITE SYSTEM — Doom-style billboards from your PNG sheets
+   ========================================================= */
+const SPRITES = { quizlingsImg: null, bossImg: null, ready: false };
+// Biome → frame strip definition [frameX, frameY, frameW, frameH, frameCount]
+const QUIZLING_DEFS = {
+  forest: [0,   18, 117, 177, 6],  // green geckos
+  desert: [936, 215, 157, 315, 3], // tan geckos
+  ice:    [704, 18, 117, 177, 6],  // white geckos
+  lava:   [0,  545, 234, 218, 6],  // lava geckos
+  coral:  [704, 18, 117, 177, 6],  // reuse white
+};
+const BOSS_DEFS = {
+  walk: [0,   0, 281, 384, 5],
+  run:  [0, 384, 352, 384, 4],
+};
+const SHEET_W = 1408, SHEET_H = 768;
+const BOSS_W  = 1408, BOSS_H  = 768;
+
+function keyOutWhite(img){
+  const cv = document.createElement('canvas'); cv.width = img.width; cv.height = img.height;
+  const ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0);
+  const id = ctx.getImageData(0, 0, cv.width, cv.height), d = id.data;
+  for(let i=0; i<d.length; i+=4){
+    // white or near-white → transparent
+    if(d[i]>215 && d[i+1]>215 && d[i+2]>215) d[i+3] = 0;
+  }
+  ctx.putImageData(id, 0, 0);
+  return cv;
+}
+
+function loadSprites(){
+  const loadImg = src => new Promise((res,rej)=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=src; });
+  Promise.all([loadImg('sprites/quizlings.png'), loadImg('sprites/boss.png')])
+    .then(([q, b])=>{
+      SPRITES.quizlingsImg = keyOutWhite(q);
+      SPRITES.bossImg      = keyOutWhite(b);
+      SPRITES.ready = true;
+    })
+    .catch(()=>{ /* fallback: use procedural Quizlings */ });
+}
+
+// Build a Three.js billboard mesh for one sprite frame
+// Returns {mesh, mat, def} — call updateSpriteFrame(obj, frame) to animate
+function buildSpriteBillboard(sheetCanvas, sheetW, sheetH, def, scale){
+  const [fx, fy, fw, fh, nframes] = def;
+  // crop one frame into a canvas
+  const cv = document.createElement('canvas'); cv.width = fw; cv.height = fh;
+  const ctx = cv.getContext('2d');
+  ctx.drawImage(sheetCanvas, fx, fy, fw, fh, 0, 0, fw, fh);
+  const tex = new THREE.CanvasTexture(cv);
+  const aspect = fw / fh;
+  const geo = new THREE.PlaneGeometry(scale * aspect, scale);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, alphaTest: 0.05, side: THREE.DoubleSide, depthWrite: false });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.y = scale * 0.5;
+  return { mesh, mat, tex, cv, ctx, sheetCanvas, def, curFrame: 0 };
+}
+
+function updateSpriteFrame(spr, frameIdx, facingLeft){
+  if(!spr) return;
+  const [fx, fy, fw, fh] = spr.def;
+  spr.ctx.clearRect(0, 0, fw, fh);
+  if(facingLeft){
+    spr.ctx.save();
+    spr.ctx.scale(-1, 1);
+    spr.ctx.drawImage(spr.sheetCanvas, fx + frameIdx*fw, fy, fw, fh, -fw, 0, fw, fh);
+    spr.ctx.restore();
+  } else {
+    spr.ctx.drawImage(spr.sheetCanvas, fx + frameIdx*fw, fy, fw, fh, 0, 0, fw, fh);
+  }
+  spr.tex.needsUpdate = true;
+  spr.curFrame = frameIdx;
+}
+
+// Make enemy face camera as a billboard
+function faceCamera(mesh){
+  if(!camera) return;
+  const dx = camera.position.x - mesh.position.x;
+  const dz = camera.position.z - mesh.position.z;
+  mesh.rotation.y = Math.atan2(dx, dz);
+}
+
+/* =========================================================
+   OUTLINE HELPER — BotW ink outline via back-face trick
+   ========================================================= */
+function addOutline(mesh, thickness, color){
+  const outGeo = mesh.geometry.clone();
+  const outMat = new THREE.MeshBasicMaterial({
+    color: color || 0x111111,
+    side: THREE.BackSide
+  });
+  const outline = new THREE.Mesh(outGeo, outMat);
+  outline.scale.multiplyScalar(1 + thickness);
+  mesh.add(outline);
+  return outline;
+}
+
+/* =========================================================
+   QUIZ QUEST 3D — a no-violence FPS-style standards reviewer
+   Built for Mr. Brown's Grade 4B • Common Core Math + ELA
+   ========================================================= */
+
+/* ---------- tiny helpers ---------- */
+const ri = (a,b) => Math.floor(Math.random()*(b-a+1))+a;        // random int inclusive
+const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+function shuffle(a){ const r=a.slice(); for(let i=r.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1)); [r[i],r[j]]=[r[j],r[i]];} return r; }
+const fmt = n => n.toLocaleString('en-US');
+
+/* Build a multiple-choice question object. choices[0] must be correct; they get shuffled. */
+function mkQ(std, q, choices, passage){
+  const correct = choices[0];
+  const mixed = shuffle(choices);
+  return { std, q, passage: passage||null, choices: mixed, a: mixed.indexOf(correct) };
+}
+/* numeric distractors near a correct value */
+function numChoices(correct, spread){
+  const set = new Set([correct]);
+  let guard = 0;
+  while(set.size < 4 && guard++ < 60){
+    let d = correct + pick([-1,1]) * ri(1, spread);
+    if(d >= 0 && d !== correct) set.add(d);
+  }
+  while(set.size < 4) set.add(correct + set.size * (spread||1) + 1);
+  const arr = [...set];
+  // ensure correct is first
+  arr.splice(arr.indexOf(correct),1); arr.unshift(correct);
+  return arr.map(fmt);
+}
+
+/* ---------- WebAudio blips (no external files) ---------- */
+let AC = null;
+function tone(freq, dur, type='sine', vol=0.18, delay=0){
+  try{
+    if(!AC) AC = new (window.AudioContext||window.webkitAudioContext)();
+    const t = AC.currentTime + delay;
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(t); o.stop(t+dur+0.02);
+  }catch(e){}
+}
+const sfx = {
+  pickup(){ tone(880,.09,'triangle'); tone(1320,.12,'triangle',.14,.07); },
+  heart(){ tone(523,.1,'sine'); tone(659,.1,'sine',.16,.09); tone(784,.18,'sine',.16,.18); },
+  door(){ tone(180,.3,'sawtooth',.07); },
+  secret(){ tone(392,.12,'square',.08); tone(523,.12,'square',.08,.1); tone(659,.2,'square',.08,.2); },
+  throwBall(){ tone(300,.12,'sine',.1); },
+  correct(){ tone(659,.1,'triangle'); tone(880,.1,'triangle',.16,.09); tone(1100,.2,'triangle',.16,.18); },
+  wrong(){ tone(220,.25,'sawtooth',.12); tone(180,.3,'sawtooth',.1,.12); },
+  checkpoint(){ tone(660,.1,'sine',.14); tone(990,.18,'sine',.14,.1); },
+  portal(){ [523,659,784,1046].forEach((f,i)=>tone(f,.16,'triangle',.14,i*.1)); },
+  catchBall(){ tone(700,.08,'square',.1); tone(1000,.14,'square',.1,.07); }
+};
+
+/* =========================================================
+   MUSIC — 12-bar blues walking bass, heavy on chromatics
+   Synthesized live; no audio files. Key & tempo per biome.
+   ========================================================= */
+const music = { on:true, idx:0, bIdx:0, nextT:0, timer:null };
+const MUSIC_KEYS = [33, 36, 29, 31, 34, 28];  // A1, C2, F1, G1, Bb1, E1 (MIDI) per biome
+const MUSIC_BPM  = [104, 112, 96, 100, 110, 124];
+/* 48 quarter notes = 12 bars. Semitones from key root.
+   I-I-I-I / IV-IV-I-I / V-IV-I-V, with chromatic walks in bars 3,4,6,8,10,12. */
+const MUSIC_BARS = [
+   0, 4, 7, 9,    10, 9, 7, 4,    0, 1, 2, 3,    4, 2, 3, 4,
+   5, 9,12,11,    10, 9, 8, 7,    0, 4, 7,10,    9, 8, 7, 6,
+   7,11,14,12,     5, 4, 2, 1,    0, 4, 7, 4,    7, 5, 2,-1
+];
+const midiHz = m => 440 * Math.pow(2, (m-69)/12);
+function bassNote(t, m, dur){
+  const o = AC.createOscillator(), g = AC.createGain(), f = AC.createBiquadFilter();
+  o.type = 'sawtooth';
+  o.frequency.value = midiHz(m);
+  f.type = 'lowpass'; f.frequency.value = 330; f.Q.value = 3;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.15, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur*0.92);
+  o.connect(f); f.connect(g); g.connect(AC.destination);
+  o.start(t); o.stop(t + dur);
+}
+/* Final Floor theme: JAWS-inspired minor seconds (E1-F1), A-A-B-A form.
+   A = the two-note stalk, starting slow then doubling speed.
+   B = the dread climbs a third higher, then slinks back down. */
+const BOSS_A = [0,null,1,null, 0,null,1,null, 0,1,0,1, 0,1,0,1];
+const BOSS_B = [3,null,4,null, 3,4,3,4, 5,6,5,6, 6,5,4,3];
+const BOSS_SEQ = BOSS_A.concat(BOSS_A, BOSS_B, BOSS_A);
+const BOSS_ROOT = 28; // E1
+function musicTick(){
+  if(!music.on || !AC || AC.state!=='running') return;
+  if(music.nextT < AC.currentTime) music.nextT = AC.currentTime + 0.05;
+  if(state.level === LEVELS.length-1){
+    const slot = 60/126/2;              // eighth notes at 126 BPM
+    while(music.nextT < AC.currentTime + 0.6){
+      const n = BOSS_SEQ[music.bIdx];
+      if(n !== null) bassNote(music.nextT, BOSS_ROOT + n, slot*1.9);
+      music.bIdx = (music.bIdx + 1) % BOSS_SEQ.length;
+      music.nextT += slot;
+    }
+    return;
+  }
+  const li = state.level % MUSIC_KEYS.length;
+  const beat = 60 / MUSIC_BPM[li];
+  while(music.nextT < AC.currentTime + 0.6){
+    bassNote(music.nextT, MUSIC_KEYS[li] + MUSIC_BARS[music.idx], beat);
+    music.idx = (music.idx + 1) % MUSIC_BARS.length;
+    music.nextT += beat;
+  }
+}
+function startMusic(){
+  try{
+    if(!AC) AC = new (window.AudioContext||window.webkitAudioContext)();
+    if(AC.state==='suspended') AC.resume();
+  }catch(e){ return; }
+  if(music.timer) return;
+  music.idx = 0;
+  music.nextT = AC.currentTime + 0.15;
+  music.timer = setInterval(musicTick, 140);
+}
+function toggleMusic(){
+  music.on = !music.on;
+  if(music.on && AC) music.nextT = AC.currentTime + 0.1;
+  const b = document.getElementById('musicBtn');
+  if(b) b.innerHTML = music.on ? '&#9835; ON' : '&#9835; OFF';
+}
+
+/* =========================================================
+   QUESTION BANKS — Common Core Grade 4
+   Each level deck = math generators + reading questions.
+   ========================================================= */
+
+/* ----- LEVEL 1 MATH: Place Value (4.NBT.A.1–3) ----- */
+const genPlaceValue = [
+  () => { // value of a digit
+    const n = ri(10000, 999999);
+    const s = String(n);
+    const idx = ri(0, s.length-1);
+    const digit = +s[idx];
+    if(digit === 0) return genPlaceValue[0]();
+    const placeVal = digit * Math.pow(10, s.length-1-idx);
+    return mkQ('4.NBT.A.2', `What is the value of the digit ${digit} in ${fmt(n)}?`,
+      numChoices(placeVal, Math.max(3, Math.floor(placeVal/2))).map(v=>v));
+  },
+  () => { // ten times relationship
+    const d = ri(2,9);
+    const place = pick([[1000,'thousands',100,'hundreds'],[100,'hundreds',10,'tens'],[10000,'ten-thousands',1000,'thousands']]);
+    return mkQ('4.NBT.A.1',
+      `In the number ${fmt(d*place[0] + d*place[2])}, the ${d} in the ${place[1]} place is how many times the value of the ${d} in the ${place[3]} place?`,
+      ['10 times','100 times','2 times','The same value']);
+  },
+  () => { // compare
+    const a = ri(10000, 99999);
+    let b = a + pick([-1,1]) * ri(1, 900);
+    const sym = a > b ? '>' : (a < b ? '<' : '=');
+    const correct = sym==='>' ? `${fmt(a)} > ${fmt(b)}` : `${fmt(a)} < ${fmt(b)}`;
+    const wrong1  = sym==='>' ? `${fmt(a)} < ${fmt(b)}` : `${fmt(a)} > ${fmt(b)}`;
+    return mkQ('4.NBT.A.2', `Which comparison is TRUE?`,
+      [correct, wrong1, `${fmt(a)} = ${fmt(b)}`, `${fmt(b)} > ${fmt(b)}`]);
+  },
+  () => { // rounding
+    const place = pick([[10,'ten'],[100,'hundred'],[1000,'thousand']]);
+    const n = ri(1200, 98000);
+    const rounded = Math.round(n/place[0])*place[0];
+    return mkQ('4.NBT.A.3', `Round ${fmt(n)} to the nearest ${place[1]}.`,
+      numChoices(rounded, place[0]*2));
+  },
+  () => { // expanded form
+    const th = ri(1,9), h = ri(1,9), t = ri(1,9), o = ri(1,9);
+    const n = th*1000 + h*100 + t*10 + o;
+    return mkQ('4.NBT.A.2', `Which shows ${fmt(n)} in expanded form?`,
+      [`${fmt(th*1000)} + ${h*100} + ${t*10} + ${o}`,
+       `${fmt(th*1000)} + ${h*10} + ${t*100} + ${o}`,
+       `${th} + ${h} + ${t} + ${o}`,
+       `${fmt(th*100)} + ${h*100} + ${t*10} + ${o}`]);
+  }
+];
+
+/* ----- LEVEL 1 READING: RL.4.1, RL.4.2, RL.4.3 ----- */
+const readL1 = [
+  mkQ('RL.4.1', 'What can you infer about how Maya feels at the end?',
+    ['She is proud that her patience paid off.','She is angry at the garden.','She wishes she had planted flowers instead.','She is afraid of tomatoes.'],
+    'Maya checked the garden every single morning, even when frost covered the ground. Her brother said the seeds would never grow. But in May, a tiny green sprout pushed through the soil. Maya knelt down and grinned so wide her cheeks hurt.'),
+  mkQ('RL.4.2', 'What is the theme of this story?',
+    ['Real friends help each other even when it is hard.','Soccer is the best sport.','Never lend anyone your things.','Winning is the most important thing.'],
+    'Devon had practiced for the spelling bee for weeks. The night before, his best friend Theo called in a panic—he had lost his notecards. Devon spent two hours helping Theo make new ones, even though it meant less practice time for himself. At the bee, they both made it to the final round.'),
+  mkQ('RL.4.3', 'Which word BEST describes Grandma Rosa?',
+    ['Determined','Lazy','Careless','Shy'],
+    'Grandma Rosa was seventy-two, but she signed up for the village 5K race anyway. She trained before sunrise, jogging past the bakery while the bread was still warm. When her knee ached, she stretched and kept going. On race day, she crossed the finish line dead last—pumping her fists like a champion.'),
+  mkQ('RL.4.1', 'Which detail from the text BEST supports the idea that Kenji was nervous?',
+    ['His hands were shaking as he gripped the violin.','The recital hall was large.','His teacher smiled at him.','The lights were bright.'],
+    'Kenji stood backstage at the recital hall. The lights were bright, and his teacher smiled at him encouragingly. His hands were shaking as he gripped the violin. He took one deep breath, walked onto the stage, and began to play.'),
+  mkQ('RL.4.2', 'Which sentence is the BEST summary of this passage?',
+    ['A girl overcomes her fear of the water and learns to swim.','A girl goes to a pool with her class.','Swimming lessons happen every Tuesday.','A teacher stands in the shallow end.'],
+    'Every Tuesday, Lina stood at the edge of the pool while her classmates splashed and laughed. The water terrified her. Her teacher waited patiently in the shallow end, week after week. One Tuesday, Lina put one foot in. The next week, two. By June, she was gliding across the pool, slow but unafraid.'),
+  mkQ('RL.4.3', 'Why does Marcus give away his prize?',
+    ['He notices his sister wanted it more than he did.','He does not like robots.','His mother tells him to share.','He already has the same toy at home.'],
+    'Marcus won the robot kit at the school raffle—the exact one he had circled in the catalog. But walking home, he saw his little sister staring at it, her eyes huge. She had entered the raffle five times and won nothing. At dinner, Marcus slid the box across the table to her without a word.'),
+  mkQ('RL.4.1', 'What can you infer happened to the cookies?',
+    ['The dog ate the cookies.','Dad moved the cookies to the fridge.','The cookies are still on the counter.','Jada hid the cookies in her room.'],
+    'Jada left a plate of cookies on the kitchen counter and went to do her homework. When she came back, the plate was empty and lying on the floor. Crumbs made a trail to the dog bed, where Biscuit was licking his lips and avoiding her eyes.'),
+];
+
+/* ----- LEVEL 2 MATH: Multiplication (4.NBT.B.5, 4.OA.A.1–3) ----- */
+const genMult = [
+  () => { const a=ri(12,89), b=ri(3,9);
+    return mkQ('4.NBT.B.5', `${a} × ${b} = ?`, numChoices(a*b, b*3)); },
+  () => { const a=ri(11,25), b=ri(11,19);
+    return mkQ('4.NBT.B.5', `${a} × ${b} = ?`, numChoices(a*b, 25)); },
+  () => { const t=ri(2,8), n=ri(3,9);
+    return mkQ('4.OA.A.1', `Mr. Brown's class collected ${n} bags of bottle caps. The other class collected ${t} times as many. Which equation shows how many bags the other class collected?`,
+      [`${n} × ${t} = ${n*t}`, `${n} + ${t} = ${n+t}`, `${n*t} × ${t} = ${n*t*t}`, `${t} − ${Math.min(t,n)} = ${t-Math.min(t,n)}`]); },
+  () => { const price=ri(3,9), count=ri(12,24), extra=ri(5,20);
+    return mkQ('4.OA.A.3', `A school store sells notebooks for ¥${price} each. The store sold ${count} notebooks and also earned ¥${extra} from stickers. How much money did the store earn in all?`,
+      numChoices(price*count+extra, 12).map(v=>'¥'+v)); },
+  () => { const a=ri(4,9), b=ri(4,9), c=ri(2,5);
+    return mkQ('4.OA.A.3', `There are ${a} shelves with ${b} books on each shelf. The librarian adds ${c} more books. How many books are there now?`,
+      numChoices(a*b+c, 8)); },
+  () => { const n=pick([[24,'1, 2, 3, 4, 6, 8, 12, 24'],[36,'1, 2, 3, 4, 6, 9, 12, 18, 36'],[18,'1, 2, 3, 6, 9, 18'],[28,'1, 2, 4, 7, 14, 28']]);
+    return mkQ('4.OA.B.4', `Which list shows ALL the factors of ${n[0]}?`,
+      [n[1], `1, ${n[0]}`, `2, 4, 6, 8`, `1, 2, 3, 4, 5`]); }
+];
+
+/* ----- LEVEL 2 READING: RI.4.1, RI.4.2, RI.4.3 ----- */
+const readL2 = [
+  mkQ('RI.4.2', 'What is the MAIN idea of this passage?',
+    ['Camels have special body features that help them survive in the desert.','Camels have two rows of eyelashes.','Deserts are very hot places.','Camels can drink water quickly.'],
+    'Camels are built for desert life. Their wide, padded feet keep them from sinking into soft sand. Two rows of long eyelashes block blowing dust from their eyes. A camel’s hump stores fat, which its body can use for energy when food is hard to find. They can even drink over 100 liters of water in just minutes.'),
+  mkQ('RI.4.1', 'According to the text, why do desert foxes have large ears?',
+    ['Large ears release body heat to keep the fox cool.','Large ears help them dig burrows.','Large ears scare away predators.','Large ears store water.'],
+    'The fennec fox is the smallest fox in the world, but it has enormous ears—up to 15 centimeters long. Those big ears are not just for hearing. They release body heat, which helps the fox stay cool in the blazing Sahara Desert. The fennec also sleeps underground during the day and hunts at night, when the sand is cooler.'),
+  mkQ('RI.4.3', 'Based on the text, what happens FIRST when a sandstorm forms?',
+    ['Strong winds begin to lift loose grains of sand.','The sky turns orange.','People cover their faces.','Sand piles up against buildings.'],
+    'A sandstorm begins when strong winds lift loose grains of sand off the ground. As the wind grows stronger, it carries more and more sand into the air, forming a moving wall that can rise hundreds of meters high. The sky often turns orange or brown. People caught in a sandstorm cover their faces and find shelter until it passes.'),
+  mkQ('RI.4.2', 'Which sentence BEST summarizes the passage?',
+    ['Cactus plants survive deserts by storing water and protecting it with spines.','Cactus spines are sharp.','Some cactuses are very tall.','Deserts get little rain.'],
+    'How does a cactus survive where almost nothing else can? The secret is storage. After a rare desert rain, a cactus soaks up water through shallow roots and stores it inside its thick, fleshy stem. A waxy coating keeps the water from escaping. Sharp spines protect the precious supply from thirsty animals.'),
+  mkQ('RI.4.3', 'What is the relationship between the oasis and desert travelers, according to the text?',
+    ['Travelers depend on oases for water and rest during long journeys.','Travelers build the oases by hand.','Oases make travel more dangerous.','Travelers avoid oases because of crowds.'],
+    'An oasis is a green island in a sea of sand—a place where underground water rises close to the surface. For thousands of years, desert travelers have planned their routes from oasis to oasis. There they refill water bags, rest their camels, and trade goods before crossing the next stretch of empty desert.'),
+  mkQ('RI.4.1', 'Which detail supports the idea that desert temperatures change dramatically?',
+    ['A desert can be 38°C in the day and near 0°C at night.','Deserts receive little rain.','Some deserts are rocky instead of sandy.','Lizards live in deserts.'],
+    'Many people think deserts are always hot, but that is only half the story. Because desert air is so dry, it cannot hold heat after sunset. A desert that bakes at 38°C in the afternoon can drop to nearly 0°C the same night. Desert animals must be ready for both extremes in a single day.'),
+];
+
+/* ----- LEVEL 3 MATH: Division (4.NBT.B.6) + Metric Measurement (4.MD.A.1–2) ----- */
+const genDivMeas = [
+  () => { const b=ri(3,9), q=ri(12,98);
+    return mkQ('4.NBT.B.6', `${b*q} ÷ ${b} = ?`, numChoices(q, 9)); },
+  () => { const b=ri(4,9), q=ri(10,40), r=ri(1,b-1);
+    return mkQ('4.NBT.B.6', `${b*q+r} ÷ ${b} = ? (Choose the quotient and remainder.)`,
+      [`${q} R${r}`, `${q+1} R${r}`, `${q} R${r===1?2:r-1}`, `${q-1} R${r}`]); },
+  () => { const km=ri(2,9);
+    return mkQ('4.MD.A.1', `How many meters are in ${km} kilometers?`, numChoices(km*1000, 900)); },
+  () => { const m=ri(2,9);
+    return mkQ('4.MD.A.1', `${m} meters = ? centimeters`, numChoices(m*100, 90)); },
+  () => { const kg=ri(2,8);
+    return mkQ('4.MD.A.1', `A penguin chick weighs ${kg} kilograms. How many grams is that?`, numChoices(kg*1000, 900)); },
+  () => { const L=ri(2,6), used=ri(1,L*1000-500);
+    return mkQ('4.MD.A.2', `A thermos holds ${L} liters of hot cocoa. The team drinks ${fmt(used)} milliliters. How many milliliters are left?`,
+      numChoices(L*1000-used, 150)); },
+  () => { const total=ri(40,96), teams=pick([4,6,8]);
+    const t = total - (total % teams);
+    return mkQ('4.MD.A.2', `${t} ice blocks are shared equally among ${teams} igloo builders. How many blocks does each builder get?`,
+      numChoices(t/teams, 5)); }
+];
+
+/* ----- LEVEL 3 READING: RL.4.5 (structure) + RL.4.6 (point of view) ----- */
+const readL3 = [
+  mkQ('RL.4.5', 'How do you know this text is a POEM?',
+    ['It is written in short lines and stanzas with rhythm and rhyme.','It has a cast of characters and stage directions.','It is written in paragraphs with chapters.','It gives facts and a diagram.'],
+    'Snowflakes drifting, soft and slow,\nDancing to the ground below.\nEach one different, lace and light,\nStitching winter, white on white.'),
+  mkQ('RL.4.5', 'Which feature tells you this is a DRAMA (play)?',
+    ['It has character names followed by lines and stage directions.','It rhymes.','It is split into stanzas.','It has a table of contents.'],
+    'ARCTIC RESCUE — Scene 2\n\nNINA: (pointing across the ice) There! Near the ridge—I saw something move!\nCAPTAIN REYES: (lowering binoculars) Steady, Nina. The ice is thin past that flag.\nNINA: We can’t just leave it out there!'),
+  mkQ('RL.4.6', 'From which point of view is this passage told?',
+    ['First person — the narrator is a character using "I."','Third person — the narrator is outside the story.','Second person — the narrator speaks to "you."','No one is telling this story.'],
+    'I pressed my mitten against the frosted window of the research station. Somewhere out in that endless white, my sled dogs were waiting for me. I zipped my parka to my chin and pushed open the heavy door.'),
+  mkQ('RL.4.6', 'How is this narration DIFFERENT from a first-person story?',
+    ['The narrator is outside the story and uses "she" instead of "I."','The narrator uses "I" and "me."','The narrator is the main character.','The narrator speaks directly to the reader as "you."'],
+    'Sora tightened the straps of her snowshoes and studied the gray sky. She knew the storm would arrive before dark. If she hurried, she could reach the cabin in two hours. She took a deep breath of frozen air and began to climb.'),
+  mkQ('RL.4.5', 'What is one difference between a poem and a story (prose)?',
+    ['A poem is built from lines and stanzas; prose is built from sentences and paragraphs.','A poem always has characters; prose never does.','Prose always rhymes; poems never rhyme.','A poem must be about nature; prose cannot be.'] ),
+  mkQ('RL.4.6', 'Which clue word would tell you a story is told in FIRST person?',
+    ['"I"','"She"','"They"','"He"'] ),
+];
+
+/* ----- LEVEL 4 MATH: Geometry (4.G.A.1–3) + Angles (4.MD.C.5–7) ----- */
+const geoStatic = [
+  () => mkQ('4.G.A.1', 'Which figure goes on forever in BOTH directions?',
+    ['A line','A line segment','A ray','A point']),
+  () => mkQ('4.G.A.1', 'A ray has…',
+    ['one endpoint and goes on forever in one direction','two endpoints','no endpoints','four endpoints']),
+  () => mkQ('4.G.A.1', 'Two lines that cross at a square corner (90°) are called…',
+    ['perpendicular lines','parallel lines','curved lines','rays']),
+  () => mkQ('4.G.A.1', 'Two lines that never meet, no matter how far they go, are…',
+    ['parallel','perpendicular','intersecting','rays']),
+  () => mkQ('4.G.A.2', 'A triangle with one 90° angle is called a…',
+    ['right triangle','acute triangle','obtuse triangle','straight triangle']),
+  () => mkQ('4.G.A.2', 'Which quadrilateral has TWO pairs of parallel sides?',
+    ['A parallelogram','A trapezoid','A triangle','A pentagon']),
+  () => mkQ('4.G.A.3', 'A shape has line symmetry if…',
+    ['it can be folded so the two halves match exactly','it has four sides','it is very large','it has at least one curve']),
+  () => mkQ('4.G.A.3', 'How many lines of symmetry does a square have?',
+    ['4','1','2','0']),
+  () => mkQ('4.MD.C.5', 'An angle that measures MORE than 90° but LESS than 180° is…',
+    ['obtuse','acute','right','straight']),
+  () => mkQ('4.MD.C.5', 'An angle that measures LESS than 90° is…',
+    ['acute','obtuse','right','reflex']),
+  () => mkQ('4.MD.C.6', 'Which tool measures angles in degrees?',
+    ['A protractor','A ruler','A thermometer','A balance scale']),
+  () => { const a=ri(20,70), b=ri(20,70);
+    return mkQ('4.MD.C.7', `An angle is split into two smaller angles of ${a}° and ${b}°. What is the measure of the whole angle?`,
+      numChoices(a+b, 15).map(v=>v+'°')); },
+  () => { const whole=pick([90,180]), part=ri(25,whole-25);
+    return mkQ('4.MD.C.7', `A ${whole}° angle is split into two parts. One part measures ${part}°. What is the other part?`,
+      numChoices(whole-part, 12).map(v=>v+'°')); },
+];
+
+/* ----- LEVEL 4 READING: RI.4.4 (vocabulary), RI.4.5 (structure), RI.4.6 (firsthand/secondhand) ----- */
+const readL4 = [
+  mkQ('RI.4.4', 'In this passage, what does the word "dormant" mean?',
+    ['Not active right now, but could become active','Exploded recently','Made of ash','Very small'],
+    'Not every volcano is erupting. A dormant volcano is one that is "sleeping"—it has not erupted in a long time, but scientists believe it could wake up again someday. Mount Fuji in Japan is a famous dormant volcano. It last erupted more than 300 years ago.'),
+  mkQ('RI.4.5', 'How is this passage organized?',
+    ['Cause and effect','Chronological order (time order)','Compare and contrast','Question and answer'],
+    'When magma pushes up through cracks in the Earth’s crust, pressure builds underground. Because of this growing pressure, gases trapped in the magma expand. As a result, the volcano can erupt, sending ash and lava into the sky. The eruption, in turn, can change weather patterns for months.'),
+  mkQ('RI.4.6', 'This account is FIRSTHAND because…',
+    ['the writer personally saw the eruption and describes her own experience','it includes dates','it was written long ago','it is about a volcano'],
+    'From my diary, August 26: The sky turned black at noon. I watched from the ship’s deck as ash fell on the water like gray snow. My hands shook so badly I could barely write these words. We sailed away from the island as fast as the wind allowed.'),
+  mkQ('RI.4.6', 'Which sentence shows this is a SECONDHAND account?',
+    ['The writer gathered information from records instead of being there.','The writer says "my hands shook."','The writer uses the word "I" to describe watching it.','The writer was on the ship’s deck.'],
+    'According to historical records, the eruption of 1883 was heard nearly 5,000 kilometers away. Scientists who later studied the reports concluded that the explosion was one of the loudest sounds in recorded history. Survivors’ letters describe ash falling for days.'),
+  mkQ('RI.4.4', 'Based on the passage, "molten" means…',
+    ['melted into liquid by heat','frozen solid','very old','underground'],
+    'Deep beneath the Earth’s surface, rock becomes so hot that it melts. This molten rock, called magma, flows like extremely thick syrup. When it reaches the surface through a volcano, we call it lava.'),
+  mkQ('RI.4.5', 'This passage is organized by COMPARE and CONTRAST. Which clue shows that?',
+    ['It explains how magma and lava are alike and different.','It lists events in time order.','It gives a problem and a solution.','It asks and answers questions.'],
+    'Magma and lava are both melted rock, and both are dangerously hot. The difference is location. Magma stays underground, hidden beneath the volcano. Lava, on the other hand, has reached the surface. Unlike magma, lava cools quickly in the open air, hardening into new rock.'),
+];
+
+/* ----- LEVEL 5 MATH: Fractions & Decimals (4.NF) ----- */
+const genFrac = [
+  () => { const base=pick([[1,2],[1,3],[2,3],[1,4],[3,4],[2,5]]); const m=ri(2,4);
+    return mkQ('4.NF.A.1', `Which fraction is EQUIVALENT to ${base[0]}/${base[1]}?`,
+      [`${base[0]*m}/${base[1]*m}`, `${base[0]+m}/${base[1]+m}`, `${base[0]}/${base[1]*m}`, `${base[1]}/${base[0]||1}`]); },
+  () => { const pairs=pick([[[3,4],[2,3]],[[5,6],[3,4]],[[2,3],[3,5]],[[7,8],[5,6]],[[4,5],[3,4]]]);
+    return mkQ('4.NF.A.2', `Which fraction is GREATER?`,
+      [`${pairs[0][0]}/${pairs[0][1]}`, `${pairs[1][0]}/${pairs[1][1]}`, 'They are equal', 'Cannot be compared']); },
+  () => { const d=pick([6,8,10,12]); const a=ri(1,d-2), b=ri(1,d-a-1);
+    return mkQ('4.NF.B.3', `${a}/${d} + ${b}/${d} = ?`,
+      [`${a+b}/${d}`, `${a+b}/${d*2}`, `${a+b+1}/${d}`, `${a+b-1}/${d}`]); },
+  () => { const d=pick([6,8,10,12]); let take=ri(1,d-1);
+    if(take*2===d) take++; // avoid "half eaten" so choices stay distinct
+    return mkQ('4.NF.B.3', `A coral pizza is cut into ${d} equal slices. The pufferfish eats ${take} slices. What fraction of the pizza is LEFT?`,
+      [`${d-take}/${d}`, `${take}/${d}`, `${d-take}/${d-take}`, `${d}/${d-take}`]); },
+  () => { const n=ri(2,5), d=pick([3,4,5,6,8]), w=ri(2,4);
+    return mkQ('4.NF.B.4', `${w} × ${n}/${d} = ?`,
+      [`${w*n}/${d}`, `${w*n}/${w*d}`, `${n}/${w*d}`, `${w*n+1}/${d}`]); },
+  () => { const t=ri(1,9);
+    return mkQ('4.NF.C.6', `Which decimal equals ${t}/10?`,
+      [`0.${t}`, `${t}.0`, `0.0${t}`, `${t}.10`]); },
+  () => { const h=ri(11,99);
+    return mkQ('4.NF.C.6', `Which decimal equals ${h}/100?`,
+      [`0.${h}`, `${h}.100`, `0.0${h}`, `${h}.0`]); },
+  () => { const a=(ri(1,9)/10).toFixed(1), b=(ri(10,99)/100).toFixed(2);
+    const correct = parseFloat(a) > parseFloat(b) ? `${a} > ${b}` : (parseFloat(a) < parseFloat(b) ? `${a} < ${b}` : `${a} = ${b}`);
+    const wrong = parseFloat(a) > parseFloat(b) ? `${a} < ${b}` : `${a} > ${b}`;
+    return mkQ('4.NF.C.7', `Which comparison is TRUE?`,
+      [correct, wrong, `${b} = 0`, `${a} = ${parseFloat(a)+1}`]); }
+];
+
+/* ----- LEVEL 5 READING: mixed review ----- */
+const readL5 = [
+  mkQ('RL.4.2', 'What lesson does the little crab learn?',
+    ['Being yourself is better than copying others.','Shells are heavy.','Swimming is faster than walking.','Never explore the reef.'],
+    'The little crab spent days trying to glide like the graceful manta ray and glow like the jellyfish. He failed at both, and his claws ached from the effort. Then a storm churned the reef, and only the crab’s strong, sideways scuttle let him grip the rocks while others tumbled past. "Perhaps," he thought, "being a crab is exactly enough."'),
+  mkQ('RI.4.2', 'What is the main idea of this passage?',
+    ['Coral reefs support a huge variety of ocean life.','Coral is colorful.','Fish can hide in coral.','Reefs are found in warm water.'],
+    'Coral reefs cover less than one percent of the ocean floor, yet they shelter about one quarter of all ocean species. Fish dart through coral branches to escape predators. Eels hide in reef caves. Sea turtles, shrimp, seahorses, and thousands of other creatures all depend on the reef for food and shelter. Scientists call reefs the "rainforests of the sea."'),
+  mkQ('RI.4.1', 'According to the passage, why do clownfish stay near anemones?',
+    ['The anemone’s stinging arms protect the clownfish from predators.','Clownfish eat the anemone.','Anemones are brightly colored.','Clownfish cannot swim far.'],
+    'The clownfish and the sea anemone make a famous team. The anemone’s arms are covered in stingers that drive away most fish—but the clownfish has a special slimy coating that keeps it safe. By living among the stinging arms, the clownfish gains a fortress that predators will not enter. In return, the clownfish chases off the anemone’s enemies and drops it scraps of food.'),
+  mkQ('RL.4.6', 'From which point of view is this told?',
+    ['First person','Third person','Second person','No point of view'],
+    'I am a sea turtle, and I have crossed this ocean more times than I can count. Tonight I return to the very beach where I hatched. My flippers remember the way, even after thirty years.'),
+  mkQ('RI.4.4', 'In this passage, "bioluminescent" means…',
+    ['able to make its own light','very large','found in deep water','dangerous to touch'],
+    'Sunlight cannot reach the deepest parts of the ocean, so many deep-sea creatures are bioluminescent—they produce their own light. The anglerfish dangles a glowing lure above its mouth. Some jellyfish flash blue when touched. In the blackness of the deep sea, living light is everywhere.'),
+  mkQ('RI.4.5', 'How is this passage structured?',
+    ['Problem and solution','Compare and contrast','Chronological order','Description only'],
+    'Coral reefs face a serious problem: warming oceans cause coral to turn white and die, a process called bleaching. Scientists are working on solutions. Some are breeding corals that survive warmer water. Others replant healthy coral pieces onto damaged reefs, like gardeners replanting a forest. Protecting reefs today may save them for tomorrow.'),
+];
+
+/* ---------- Deck: serves shuffled questions, refills automatically ---------- */
+class Deck {
+  constructor(gens, statics){ this.gens = gens; this.statics = statics; this.pile = []; }
+  refill(){
+    const qs = this.statics.map(s => (typeof s === 'function') ? s() : s);
+    const genQs = [];
+    for(let i=0;i<this.gens.length;i++){ genQs.push(this.gens[i]()); genQs.push(this.gens[i]()); }
+    this.pile = shuffle(qs.concat(genQs));
+  }
+  draw(){ if(this.pile.length===0) this.refill(); return this.pile.pop(); }
+}
+/* =========================================================
+   LEVEL DATA — 5 biomes
+   Legend: # wall  . floor  D door  S secret wall  P player
+           C checkpoint  X exit  E enemy  H extra chance
+           pickups: p pencil(25) e eraser(50) r ruler(75)
+                    b book(100) g glue(150) k backpack(200)
+   ========================================================= */
+const LEVELS = [
+{
+  name: 'Biome 1 • Whispering Forest',
+  focus: 'Place Value (4.NBT.A) + Story Detective (RL.4.1–4.3)',
+  biome: { sky:0x9cc9e8, ceil:0x9cc9e8, floor:0x4a7f3d, wall:0x55753f, wall2:0x3d5a2c,
+           fog:0xa8c8a0, fogFar:70, enemy:0x6fae3e, accent:0xffd766, pattern:'leaf' },
+  deck: () => new Deck(genPlaceValue, readL1),
+  map: [
+    "#######################",
+    "#P.....#p......#....b.#",
+    "#..p...#..E....#.C....#",
+    "#......D.......D......#",
+    "#...e..#.......#......#",
+    "#......#..##...#...E..#",
+    "########.......#......#",
+    "#g.........E...#......#",
+    "#..####...####.#..##..#",
+    "#..#r..#.......#......#",
+    "#..#...#..E....#...k..#",
+    "#..#...#.......D......#",
+    "####...#.......#......#",
+    "#bH.S..........#..X...#",
+    "#######################"
+  ]
+},
+{
+  name: 'Biome 2 • Sunscorch Desert',
+  focus: 'Multiplication (4.NBT.B.5, 4.OA) + Info Hunter (RI.4.1–4.3)',
+  biome: { sky:0xf2d9a8, ceil:0xf2d9a8, floor:0xd9b36c, wall:0xc28e4d, wall2:0xa9763c,
+           fog:0xe8cfa0, fogFar:75, enemy:0xe0892c, accent:0xff8a50, pattern:'brick' },
+  deck: () => new Deck(genMult, readL2),
+  map: [
+    "#######################",
+    "#P....#....b...#....k.#",
+    "#.p...#........#......#",
+    "#.....D...E....D...E..#",
+    "#..##.#........#......#",
+    "#..#..#..####..#..##..#",
+    "#..#.....#g#...#..C...#",
+    "#..#......D....#......#",
+    "#..........####.....E.#",
+    "#.####..#..#...#####..#",
+    "#.#g.#..#..#.E.....#..#",
+    "#.#..#..#..#....##....#",
+    "#.#..D..#..D...####S###",
+    "#X..r.#..........#Hk..#",
+    "#######################"
+  ]
+},
+{
+  name: 'Biome 3 • Frozen Tundra',
+  focus: 'Division + Metric Measurement (4.NBT.B.6, 4.MD.A) + Poems, Plays & POV (RL.4.5–4.6)',
+  biome: { sky:0xdef0fa, ceil:0xdef0fa, floor:0xb8d8ea, wall:0x9fc4dd, wall2:0x7fa9c8,
+           fog:0xd3e9f7, fogFar:65, enemy:0x4fb3dd, accent:0x9be8ff, pattern:'ice' },
+  deck: () => new Deck(genDivMeas, readL3),
+  map: [
+    "#######################",
+    "#P.....#......b#......#",
+    "#......#.......#..E...#",
+    "#..p...D...E...#...C..#",
+    "#......#.......D......#",
+    "########..##...#......#",
+    "#k.....D..##...#..##..#",
+    "#......#...E...#......#",
+    "#..####........##..#..#",
+    "#..#g......E....#..#..#",
+    "#..#............#..D..#",
+    "##S#####........#..#..#",
+    "#H.r#..........X#..#..#",
+    "####...........#......#",
+    "#######################"
+  ]
+},
+{
+  name: 'Biome 4 • Ember Caverns',
+  focus: 'Geometry & Angles (4.G.A, 4.MD.C) + Word & Structure Sleuth (RI.4.4–4.6)',
+  biome: { sky:0x2a1a18, ceil:0x2a1a18, floor:0x4a3530, wall:0x6b3a30, wall2:0x52281f,
+           fog:0x55241c, fogFar:55, enemy:0xff7043, accent:0xff5722, pattern:'rock' },
+  deck: () => new Deck([], geoStatic.concat(readL4)),
+  map: [
+    "#######################",
+    "#P..p..#...e...#....b.#",
+    "#......#.......#......#",
+    "#......D..E....D...E..#",
+    "#......#.......#......#",
+    "####.###...##..#..C...#",
+    "#g.#...........#......#",
+    "#..D...E.......D......#",
+    "#..#.......##..#...k..#",
+    "####...#...##..#......#",
+    "#..#...#.......D......#",
+    "#..#...#.......#####S##",
+    "#..D...#..E....#..b.H.#",
+    "#X.#...........########",
+    "#######################"
+  ]
+},
+{
+  name: 'Biome 5 • Coral Temple',
+  focus: 'Fractions & Decimals (4.NF) + Reading Champion Review',
+  biome: { sky:0x14394f, ceil:0x14394f, floor:0x3a8a8c, wall:0x2b6f8e, wall2:0x1f5670,
+           fog:0x1d4f66, fogFar:60, enemy:0x29b6d8, accent:0x7df9ff, pattern:'tile' },
+  deck: () => new Deck(genFrac, readL5),
+  map: [
+    "#######################",
+    "#P.....#...p...#..b...#",
+    "#......#.......#......#",
+    "#...E..D...E...D....E.#",
+    "#......#.......#......#",
+    "###D########...####D###",
+    "#e.........#...#....r.#",
+    "#..##..##..D...#..C...#",
+    "#..##..##..#...#......#",
+    "#..........#...####D###",
+    "#.E......g.#..E.......#",
+    "#..####....#...####.#S#",
+    "#..#g..#...D...#..##kH#",
+    "#X.D...........#...####",
+    "#######################"
+  ]
+},
+{
+  name: 'Final Floor • Quizzard Keep',
+  focus: 'BOSS BATTLE — Grade 4 Grand Review (Math + Reading)',
+  biome: { sky:0x1a0f2e, ceil:0x1a0f2e, floor:0x2e2440, wall:0x4a3566, wall2:0x37264e,
+           fog:0x241638, fogFar:60, enemy:0xc77dff, accent:0xb14aff, pattern:'rock' },
+  deck: () => new Deck(
+    genPlaceValue.concat(genMult, genDivMeas, genFrac),
+    readL1.slice(0,2).concat(readL2.slice(0,2), readL3.slice(0,2), readL4.slice(0,2), readL5.slice(0,2))),
+  map: [
+    "#######################",
+    "#P...#.....b.....#.E..#",
+    "#.C..#...........#..g.#",
+    "#....D...........D....#",
+    "######..#######..######",
+    "#e...#...........#...r#",
+    "#.E..D.....B.....D..E.#",
+    "#....#...........#....#",
+    "#..k.#...........#.b..#",
+    "######..#######..######",
+    "#....D...........D....#",
+    "#.E..#.....p.....#..E.#",
+    "#....####S########....#",
+    "#....#..H.k......#....#",
+    "#######################"
+  ]
+}
+];
+
+const PICKUP_DEFS = {
+  p: { name:'Pencil',   points:25 },
+  e: { name:'Eraser',   points:50 },
+  r: { name:'Ruler',    points:75 },
+  b: { name:'Book',     points:100 },
+  g: { name:'Glue Stick', points:150 },
+  k: { name:'Backpack', points:200 }
+};
+/* =========================================================
+   ENGINE
+   ========================================================= */
+const TILE = 4, WALLH = 4, EYE = 1.7;
+const canvas = document.getElementById('game');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+const camera = new THREE.PerspectiveCamera(72, window.innerWidth/window.innerHeight, 0.1, 400);
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+let scene = null;
+const state = {
+  mode: 'menu',           // menu | play | quiz | dead | transition | pause | win
+  level: 0, score: 0, hearts: 5, ammo: 0, mapMode: 'easy',
+  playerName: '', playerClass: '',
+  respawn: { x:0, z:0, yaw:0 },
+  invulnUntil: 0,
+  stats: { questions:0, correct:0, treasures:0, secrets:0 },
+  totalCorrect: 0, totalQuestions: 0
+};
+const player = { x:0, z:0, yaw:0, pitch:0, r:0.8, speed:8.5 };
+let world = null;   // rebuilt each level
+let deck = null;
+
+/* ---------- materials & mesh helpers (CEL-SHADED) ---------- */
+function toon(color, emissive, ei){
+  const m = new THREE.MeshToonMaterial({ color, gradientMap: TOON_GRADIENT });
+  if(emissive){ m.emissive = new THREE.Color(emissive); m.emissiveIntensity = ei ?? 0.5; }
+  return m;
+}
+const lam = toon; // alias — engine code calls lam(), we redirect to toon()
+function box(w,h,d, mat){ return new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat); }
+
+/* ---------- procedural biome wall textures (smooth, non-pixelated) ---------- */
+function makeWallTexture(pattern, c1hex, c2hex, accentHex){
+  const size = 256;
+  const cv = document.createElement('canvas'); cv.width = cv.height = size;
+  const g = cv.getContext('2d');
+  const c1 = new THREE.Color(c1hex), c2 = new THREE.Color(c2hex), ac = new THREE.Color(accentHex);
+  const W = new THREE.Color(0xffffff), K = new THREE.Color(0x000000);
+  const css = (c,a=1)=>`rgba(${Math.round(c.r*255)},${Math.round(c.g*255)},${Math.round(c.b*255)},${a})`;
+  const mix = (a,b,t)=>a.clone().lerp(b,t);
+
+  // soft base gradient + fine grain
+  const gr = g.createLinearGradient(0,0,0,size);
+  gr.addColorStop(0, css(mix(c1,c2,.15)));
+  gr.addColorStop(1, css(c2));
+  g.fillStyle = gr; g.fillRect(0,0,size,size);
+  for(let i=0;i<800;i++){
+    g.fillStyle = css(mix(c1,c2,Math.random()), .15);
+    g.fillRect(Math.random()*size, Math.random()*size, 2+Math.random()*4, 2+Math.random()*4);
+  }
+
+  if(pattern==='leaf'){            // forest hedge: layered leaves + vines
+    for(let i=0;i<260;i++){
+      g.save();
+      g.translate(Math.random()*size, Math.random()*size);
+      g.rotate(Math.random()*Math.PI);
+      g.fillStyle = css(mix(mix(c1,c2,Math.random()), W, Math.random()*.18), .45);
+      g.beginPath(); g.ellipse(0,0, 6+Math.random()*11, 3+Math.random()*6, 0, 0, Math.PI*2); g.fill();
+      g.restore();
+    }
+    g.strokeStyle = css(mix(c2,K,.35), .5); g.lineWidth = 2.5;
+    for(let i=0;i<6;i++){
+      g.beginPath();
+      const x = Math.random()*size;
+      g.moveTo(x, 0);
+      g.bezierCurveTo(x+ri(-40,40), size*.33, x+ri(-40,40), size*.66, x+ri(-40,40), size);
+      g.stroke();
+    }
+  } else if(pattern==='brick'){    // desert sandstone bricks
+    const bh = 42, bw = 64;
+    for(let row=0, y=0; y<size; y+=bh, row++){
+      const off = (row%2) * bw/2;
+      for(let x=-bw; x<size+bw; x+=bw){
+        g.fillStyle = css(mix(c1, c2, .25+Math.random()*.6));
+        g.fillRect(x+off+2, y+2, bw-4, bh-4);
+        g.fillStyle = css(mix(c1, W, .12), .25);    // sun-bleached top edge
+        g.fillRect(x+off+2, y+2, bw-4, 6);
+      }
+    }
+    g.strokeStyle = css(mix(c2,K,.4), .85); g.lineWidth = 4;
+    for(let y=0; y<=size; y+=bh){ g.beginPath(); g.moveTo(0,y); g.lineTo(size,y); g.stroke(); }
+    for(let row=0, y=0; y<size; y+=bh, row++){
+      const off = (row%2) * bw/2;
+      for(let x=off; x<=size; x+=bw){ g.beginPath(); g.moveTo(x,y); g.lineTo(x,y+bh); g.stroke(); }
+    }
+    for(let i=0;i<300;i++){ g.fillStyle = css(mix(c1,c2,Math.random()), .2);
+      g.fillRect(Math.random()*size, Math.random()*size, 2, 2); }
+  } else if(pattern==='ice'){      // glacial blocks with frosty streaks
+    const b = 128;
+    for(let y=0;y<size;y+=b) for(let x=0;x<size;x+=b){
+      const grad = g.createLinearGradient(x,y,x+b,y+b);
+      grad.addColorStop(0, css(mix(c1,W,.25+Math.random()*.15)));
+      grad.addColorStop(1, css(mix(c2,W,Math.random()*.1)));
+      g.fillStyle = grad; g.fillRect(x+3,y+3,b-6,b-6);
+    }
+    g.strokeStyle = css(mix(W,c1,.3), .65); g.lineWidth = 3;
+    for(let y=0;y<=size;y+=b){ g.beginPath(); g.moveTo(0,y); g.lineTo(size,y); g.stroke();
+      g.beginPath(); g.moveTo(y,0); g.lineTo(y,size); g.stroke(); }
+    g.strokeStyle = css(W,.14); g.lineWidth = 2;
+    for(let i=0;i<14;i++){
+      const x=Math.random()*size, y=Math.random()*size, l=30+Math.random()*70;
+      g.beginPath(); g.moveTo(x,y); g.lineTo(x+l, y+l*.6); g.stroke();
+    }
+    for(let i=0;i<40;i++){ g.fillStyle = css(W,.5);
+      g.beginPath(); g.arc(Math.random()*size, Math.random()*size, 1.2, 0, 7); g.fill(); }
+  } else if(pattern==='rock'){     // volcanic basalt: dark patches, cracks, embers
+    for(let i=0;i<16;i++){
+      g.fillStyle = css(mix(c1,K,.15+Math.random()*.3), .5);
+      g.beginPath();
+      const cx=Math.random()*size, cy=Math.random()*size, r=22+Math.random()*36;
+      for(let a=0;a<7;a++){
+        const ang=a/7*Math.PI*2, rr=r*(.6+Math.random()*.5);
+        const px=cx+Math.cos(ang)*rr, py=cy+Math.sin(ang)*rr;
+        a===0 ? g.moveTo(px,py) : g.lineTo(px,py);
+      }
+      g.closePath(); g.fill();
+    }
+    g.strokeStyle = css(K,.6); g.lineWidth = 2.5;
+    for(let i=0;i<8;i++){
+      let x=Math.random()*size, y=0;
+      g.beginPath(); g.moveTo(x,y);
+      while(y<size){ x+=ri(-22,22); y+=ri(18,42); g.lineTo(x,y); }
+      g.stroke();
+    }
+    for(let i=0;i<22;i++){          // glowing ember flecks
+      g.save(); g.shadowColor = css(ac,.9); g.shadowBlur = 7;
+      g.fillStyle = css(mix(ac,W,.3), .85);
+      g.beginPath(); g.arc(Math.random()*size, Math.random()*size, 1.6+Math.random()*1.6, 0, 7); g.fill();
+      g.restore();
+    }
+  } else if(pattern==='tile'){     // sunken temple mosaic + coral growth
+    const t = 32;
+    for(let y=0;y<size;y+=t) for(let x=0;x<size;x+=t){
+      g.fillStyle = css(mix(c1, c2, Math.random()*.9));
+      g.fillRect(x+1.5, y+1.5, t-3, t-3);
+    }
+    g.strokeStyle = css(mix(c2,K,.45), .8); g.lineWidth = 2.5;
+    for(let v=0; v<=size; v+=t){
+      g.beginPath(); g.moveTo(0,v); g.lineTo(size,v); g.stroke();
+      g.beginPath(); g.moveTo(v,0); g.lineTo(v,size); g.stroke();
+    }
+    for(let i=0;i<14;i++){          // coral / algae patches
+      g.fillStyle = css(mix(ac, c1, Math.random()*.4), .4);
+      g.beginPath(); g.arc(Math.random()*size, Math.random()*size, 4+Math.random()*9, 0, 7); g.fill();
+    }
+  }
+  // BotW-style: bold black ink grid lines over every texture
+  g.globalAlpha = 0.22;
+  g.strokeStyle = '#000'; g.lineWidth = 3.5;
+  const grid = size / 4;
+  for(let v = 0; v <= size; v += grid){
+    g.beginPath(); g.moveTo(0,v); g.lineTo(size,v); g.stroke();
+    g.beginPath(); g.moveTo(v,0); g.lineTo(v,size); g.stroke();
+  }
+  // specular highlight strip (top-left edge, like cel shading)
+  const hiGrad = g.createLinearGradient(0,0,size*.25,size*.25);
+  hiGrad.addColorStop(0, 'rgba(255,255,255,0.22)');
+  hiGrad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.globalAlpha = 1;
+  g.fillStyle = hiGrad; g.fillRect(0,0,size,size);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return tex;
+}
+
+/* ---------- pickup model factory ---------- */
+function buildPickup(type, accent){
+  const g = new THREE.Group();
+  if(type==='p'){ // pencil
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(.09,.09,1.1,8), lam(0xffc93c));
+    const tip  = new THREE.Mesh(new THREE.ConeGeometry(.09,.25,8), lam(0xe8b88a));
+    const lead = new THREE.Mesh(new THREE.ConeGeometry(.035,.1,8), lam(0x333333));
+    tip.position.y = .67; lead.position.y = .82;
+    const erub = new THREE.Mesh(new THREE.CylinderGeometry(.095,.095,.14,8), lam(0xff8fa3));
+    erub.position.y = -.62;
+    g.add(body,tip,lead,erub); g.rotation.z = .9;
+  } else if(type==='e'){ // eraser
+    g.add(box(.7,.3,.4, lam(0xff8fa3)));
+    const band = box(.72,.12,.42, lam(0x4f8fde)); band.position.y=.05; g.add(band);
+  } else if(type==='r'){ // ruler
+    const r = box(1.3,.06,.32, lam(0xe8c98a)); g.add(r);
+    for(let i=0;i<5;i++){ const t=box(.03,.07,.12, lam(0x7a5c33)); t.position.set(-.5+i*.25,.03,-.1); g.add(t); }
+    g.rotation.y = .6;
+  } else if(type==='b'){ // book
+    const cover = box(.8,.18,.6, lam(0xc0392b)); g.add(cover);
+    const pages = box(.74,.12,.54, lam(0xf5f0e6)); pages.position.y=.02; g.add(pages);
+    const spine = box(.06,.2,.62, lam(0x8e2418)); spine.position.x=-.38; g.add(spine);
+  } else if(type==='g'){ // glue stick: chunky purple tube with label band + wide cap
+    const body  = new THREE.Mesh(new THREE.CylinderGeometry(.24,.24,.55,12), lam(0x8a5fd9));
+    const label = new THREE.Mesh(new THREE.CylinderGeometry(.25,.25,.24,12), lam(0xf5f0e6));
+    const cap   = new THREE.Mesh(new THREE.CylinderGeometry(.27,.27,.2,12),  lam(0x5636a8));
+    const base  = new THREE.Mesh(new THREE.CylinderGeometry(.27,.27,.09,12), lam(0x5636a8));
+    cap.position.y = .37; base.position.y = -.31;
+    g.add(body, label, cap, base);
+  } else if(type==='k'){ // backpack
+    const body = box(.7,.85,.4, lam(0x3567c4)); g.add(body);
+    const pocket = box(.45,.4,.12, lam(0x274f97)); pocket.position.set(0,-.12,.26); g.add(pocket);
+    const strapL = box(.1,.7,.08, lam(0x1d3a6e)); strapL.position.set(-.2,0,-.26); g.add(strapL);
+    const strapR = strapL.clone(); strapR.position.x = .2; g.add(strapR);
+  } else if(type==='H'){ // shiny apple = extra chance
+    const a = new THREE.Mesh(new THREE.SphereGeometry(.4,14,12), lam(0xe23b3b, 0x701414, .55));
+    a.scale.y = .9; g.add(a);
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(.04,.04,.25,6), lam(0x6e4a25));
+    stem.position.y = .42; g.add(stem);
+    const leaf = new THREE.Mesh(new THREE.SphereGeometry(.12,8,6), lam(0x4caf50));
+    leaf.scale.set(1.6,.5,.8); leaf.position.set(.14,.46,0); g.add(leaf);
+  }
+  return g;
+}
+
+/* ---------- Quizling factory — sprite billboard or 3-D fallback ---------- */
+function buildQuizling(color){
+  const g = new THREE.Group();
+  g.__isSprite = false;
+  if(SPRITES.ready){
+    // pick biome-matched strip
+    const biomeKey = (() => {
+      const lv = LEVELS[state.level];
+      const p = lv.biome.pattern;
+      if(p==='leaf')  return 'forest';
+      if(p==='brick') return 'desert';
+      if(p==='ice')   return 'ice';
+      if(p==='rock')  return 'lava';
+      return 'coral';
+    })();
+    const def = QUIZLING_DEFS[biomeKey];
+    const spr = buildSpriteBillboard(SPRITES.quizlingsImg, SHEET_W, SHEET_H, def, 3.2);
+    g.add(spr.mesh);
+    g.__spriteObj = spr;
+    g.__isSprite = true;
+    return g;
+  }
+  // ── 3-D procedural fallback (original code) ──
+  const bodyMat = toon(color);
+  const body = new THREE.Mesh(new THREE.SphereGeometry(.85,16,14), bodyMat);
+  body.scale.y = 1.12; body.position.y = 1.0; g.add(body);
+  addOutline(body, 0.06);
+  const belly = new THREE.Mesh(new THREE.SphereGeometry(.62,14,12), toon(0xfff3d6));
+  belly.scale.set(1,.95,.6); belly.position.set(0,.88,.42); g.add(belly);
+  for(const s of [-1,1]){
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(.2,10,8), toon(0xffffff, 0xffffff, .35));
+    eye.position.set(.3*s,1.32,.66); g.add(eye);
+    const pupil = new THREE.Mesh(new THREE.SphereGeometry(.09,8,6), toon(0x222222));
+    pupil.position.set(.3*s,1.32,.84); g.add(pupil);
+    const foot = new THREE.Mesh(new THREE.SphereGeometry(.22,8,6), toon(0x333333));
+    foot.scale.set(1,.5,1.4); foot.position.set(.32*s,.1,.1); g.add(foot);
+  }
+  const ant = new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,.5,6), bodyMat);
+  ant.position.y = 2.15; g.add(ant);
+  const antBall = new THREE.Mesh(new THREE.SphereGeometry(.12,8,6), toon(0xffd766, 0xffd766, .6));
+  antBall.position.y = 2.45; g.add(antBall);
+  return g;
+}
+
+function buildQuestionBall(accent){
+  const g = new THREE.Group();
+  const core = new THREE.Mesh(new THREE.SphereGeometry(.32,14,12), lam(0xffffff, 0xbbbbbb, .35));
+  g.add(core);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(.42,.05,8,24), lam(accent, accent, .8));
+  g.add(ring);
+  return g;
+}
+
+function spawnEnemy(x,z){
+  const mesh = buildQuizling(LEVELS[state.level].biome.enemy);
+  mesh.position.set(x,0,z); scene.add(mesh);
+  world.enemies.push({ mesh, x, z, r:.8, state:'roam', cool: 2.5+Math.random()*2,
+    bobT: Math.random()*6, catchT: 0, homeX:x, homeZ:z });
+}
+
+/* ---------- map helpers ---------- */
+const tx = gx => gx*TILE + TILE/2;
+const tz = gz => gz*TILE + TILE/2;
+const gOf = v => Math.floor(v / TILE);
+function cellAt(gx,gz){
+  if(!world) return '#';
+  if(gz<0 || gz>=world.rows || gx<0 || gx>=world.cols) return '#';
+  return world.grid[gz][gx];
+}
+function isSolid(gx,gz){
+  const c = cellAt(gx,gz);
+  if(c==='#') return true;
+  if(c==='D'){ const d = world.doors.get(gx+','+gz); return d.state!=='open'; }
+  if(c==='S'){ const s = world.secrets.get(gx+','+gz); return !s.opened; }
+  return false;
+}
+function canStand(x,z,r){
+  for(const dx of [-r,r]) for(const dz of [-r,r])
+    if(isSolid(gOf(x+dx), gOf(z+dz))) return false;
+  return true;
+}
+/* simple grid line-of-sight */
+function hasLOS(x1,z1,x2,z2){
+  const dx=x2-x1, dz=z2-z1, dist=Math.hypot(dx,dz), steps=Math.ceil(dist/1.2);
+  for(let i=1;i<steps;i++){
+    const t=i/steps;
+    if(isSolid(gOf(x1+dx*t), gOf(z1+dz*t))) return false;
+  }
+  return true;
+}
+
+/* ---------- level construction ---------- */
+function loadLevel(idx){
+  state.level = idx;
+  const L = LEVELS[idx];
+  deck = L.deck();
+  state.stats = { questions:0, correct:0, treasures:0, secrets:0, caught:0, missed:{} };
+  state.hearts = 5;
+  state.ammo = 0;
+  if(typeof updateAmmoHUD === 'function') updateAmmoHUD();
+
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(L.biome.sky);
+  scene.fog = new THREE.Fog(L.biome.fog, 6, L.biome.fogFar);
+  scene.add(new THREE.HemisphereLight(L.biome.sky, L.biome.floor, 0.7));
+  const sun = new THREE.DirectionalLight(0xffffff, 1.1);
+  const fill = new THREE.DirectionalLight(0xffffff, 0.35); fill.position.set(-20, 10, -30); scene.add(fill);
+  sun.position.set(30, 60, 20); scene.add(sun);
+
+  const rows = L.map.length, cols = L.map[0].length;
+  world = {
+    grid: L.map.map(r => r.split('')),
+    rows, cols, doors: new Map(), secrets: new Map(),
+    pickups: [], enemies: [], balls: [], checkpoints: [], exit: null,
+    eSpawns: [], boss: null, regenT: 10
+  };
+
+  // floor & ceiling
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(cols*TILE, rows*TILE), lam(L.biome.floor));
+  floor.rotation.x = -Math.PI/2;
+  floor.position.set(cols*TILE/2, 0, rows*TILE/2);
+  scene.add(floor);
+  const ceil = new THREE.Mesh(new THREE.PlaneGeometry(cols*TILE, rows*TILE), lam(L.biome.ceil));
+  ceil.rotation.x = Math.PI/2;
+  ceil.position.set(cols*TILE/2, WALLH, rows*TILE/2);
+  scene.add(ceil);
+
+  const wallTex = makeWallTexture(L.biome.pattern, L.biome.wall, L.biome.wall2, L.biome.accent);
+  const matA = new THREE.MeshToonMaterial({ map: wallTex, gradientMap: TOON_GRADIENT });
+  const matB = new THREE.MeshToonMaterial({ map: wallTex, color: 0xc9c9c9, gradientMap: TOON_GRADIENT });
+  const matS = new THREE.MeshToonMaterial({ map: wallTex, emissive: new THREE.Color(0x232323), emissiveIntensity: 0.5, gradientMap: TOON_GRADIENT }); // secret: brighter
+
+  for(let gz=0; gz<rows; gz++){
+    for(let gx=0; gx<cols; gx++){
+      const c = world.grid[gz][gx];
+      const x = tx(gx), z = tz(gz);
+      if(c==='#'){
+        const m = box(TILE, WALLH, TILE, (gx+gz)%2 ? matA : matB);
+        m.position.set(x, WALLH/2, z); scene.add(m);
+      }
+      else if(c==='D'){
+        const door = box(TILE, WALLH, TILE*0.45, lam(L.biome.accent));
+        door.position.set(x, WALLH/2, z);
+        // frame stripe
+        const stripe = box(TILE*0.92, .35, TILE*0.47, lam(0xffffff, 0xffffff, .25));
+        stripe.position.y = .9; door.add(stripe);
+        // orient: if walls left & right, keep; if walls above & below, rotate
+        const wallsLR = (L.map[gz][gx-1]==='#') && (L.map[gz][gx+1]==='#');
+        if(!wallsLR) door.rotation.y = Math.PI/2;
+        scene.add(door);
+        world.doors.set(gx+','+gz, { gx, gz, mesh:door, state:'closed', prog:0, baseY:WALLH/2 });
+      }
+      else if(c==='S'){
+        const m = box(TILE, WALLH, TILE, matS);
+        m.position.set(x, WALLH/2, z); scene.add(m);
+        world.secrets.set(gx+','+gz, { gx, gz, mesh:m, opened:false, prog:0 });
+      }
+      else if(c==='P'){
+        player.x = x; player.z = z; player.yaw = Math.PI; // face into the map
+        state.respawn = { x, z, yaw: player.yaw };
+        world.grid[gz][gx]='.';
+      }
+      else if(c==='C'){
+        const pad = new THREE.Mesh(new THREE.CylinderGeometry(1.3,1.3,.12,20), lam(0x35e0c0, 0x1de9b6, .8));
+        pad.position.set(x,.06,z); scene.add(pad);
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(1.45,.08,8,28), lam(0xffffff, 0x9bfff0, .7));
+        ring.rotation.x = Math.PI/2; ring.position.set(x,.3,z); scene.add(ring);
+        world.checkpoints.push({ x, z, mesh:pad, ring, used:false });
+        world.grid[gz][gx]='.';
+      }
+      else if(c==='X'){
+        const portal = new THREE.Mesh(new THREE.TorusGeometry(1.3,.22,12,30), toon(L.biome.accent, L.biome.accent, .9));
+        addOutline(portal, 0.08);
+        portal.position.set(x, 1.9, z); scene.add(portal);
+        const glow = new THREE.Mesh(new THREE.CylinderGeometry(.9,.9,.05,20), lam(0xffffff, 0xffffff, .9));
+        glow.position.set(x,.05,z); scene.add(glow);
+        world.exit = { x, z, portal };
+        world.grid[gz][gx]='.';
+      }
+      else if(c==='E'){
+        world.eSpawns.push({x, z});
+        spawnEnemy(x, z);
+        world.grid[gz][gx]='.';
+      }
+      else if(c==='B'){
+        let mesh;
+        if(SPRITES.ready){
+          const grp = new THREE.Group();
+          const def = BOSS_DEFS['walk'];
+          const spr = buildSpriteBillboard(SPRITES.bossImg, BOSS_W, BOSS_H, def, 4.8);
+          grp.add(spr.mesh);
+          grp.__isSprite = true;
+          grp.__spriteObj = spr;
+          grp.__bossRunDef = BOSS_DEFS['run'];
+          mesh = grp;
+        } else {
+          mesh = buildQuizling(0x7a2fd1);
+          mesh.scale.setScalar(1.55);
+          const crown = new THREE.Mesh(new THREE.ConeGeometry(.34,.5,8), toon(0xffd766, 0xffd766, .65));
+          crown.position.y = 2.62; mesh.add(crown);
+          for(const s of [-1,1]){
+            const brow = box(.4,.1,.1, toon(0x1c0f2e));
+            brow.position.set(.3*s, 1.58, .76); brow.rotation.z = .5*s; mesh.add(brow);
+          }
+        }
+        mesh.position.set(x,0,z); scene.add(mesh);
+        world.boss = { mesh, x, z, hp:3, maxHp:3, state:'chase', cool:3.5, bobT:0, catchT:0, hitT:0 };
+        world.grid[gz][gx]='.';
+      }
+      else if(c==='H' || PICKUP_DEFS[c]){
+        const mesh = buildPickup(c, L.biome.accent);
+        mesh.position.set(x, 1.0, z); scene.add(mesh);
+        world.pickups.push({ mesh, x, z, type:c, t: Math.random()*6 });
+        world.grid[gz][gx]='.';
+      }
+    }
+  }
+  // per-level totals for the score screen percentages
+  world.totals = {
+    supplies: world.pickups.filter(p => p.type!=='H').length,
+    secrets: world.secrets.size,
+    enemies: world.enemies.length
+  };
+  player.pitch = 0;
+  // minimap setup: fog-of-war memory + canvas sizing
+  world.seen = new Uint8Array(rows*cols);
+  const MM = 9; // pixels per tile
+  const mmc = document.getElementById('minimap');
+  mmc.width = cols*MM; mmc.height = rows*MM;
+  world.mmScale = MM;
+  revealAround();
+  document.getElementById('levelName').textContent = L.name;
+  document.getElementById('levelStd').textContent = L.focus;
+  updateBossHUD();
+  if(world.boss) toast('Earn balls from Quizlings, then hit THE QUIZZARD 3 times!','gold');
+  updateHUD();
+}
+
+function updateBossHUD(){
+  const el = document.getElementById('bossBox');
+  if(!world || !world.boss || world.boss.state==='dead'){ el.style.display='none'; return; }
+  el.style.display='block';
+  let s = '&#128081; THE QUIZZARD &nbsp;';
+  for(let i=0;i<world.boss.maxHp;i++)
+    s += '<span class="' + (i<world.boss.hp?'heartOn':'heartOff') + '">&#10084;</span>';
+  el.innerHTML = s;
+}
+
+/* ---------- minimap ---------- */
+function revealAround(){
+  const pgx = gOf(player.x), pgz = gOf(player.z), R = 4;
+  for(let dz=-R; dz<=R; dz++) for(let dx=-R; dx<=R; dx++){
+    if(dx*dx+dz*dz > R*R+2) continue;
+    const gx = pgx+dx, gz = pgz+dz;
+    if(gx>=0 && gx<world.cols && gz>=0 && gz<world.rows)
+      world.seen[gz*world.cols+gx] = 1;
+  }
+}
+function drawMinimap(){
+  const mmc = document.getElementById('minimap');
+  const g = mmc.getContext('2d');
+  const s = world.mmScale, L = LEVELS[state.level];
+  const wallCss = '#'+new THREE.Color(L.biome.wall).getHexString();
+  const accCss  = '#'+new THREE.Color(L.biome.accent).getHexString();
+  const enCss   = '#'+new THREE.Color(L.biome.enemy).getHexString();
+  g.clearRect(0,0,mmc.width,mmc.height);
+  const easy = state.mapMode === 'easy';
+  const vis = (gx,gz) => easy || world.seen[gz*world.cols+gx];
+  for(let gz=0; gz<world.rows; gz++){
+    for(let gx=0; gx<world.cols; gx++){
+      if(!vis(gx,gz)){ g.fillStyle='rgba(6,9,16,0.95)'; g.fillRect(gx*s,gz*s,s,s); continue; }
+      const c = world.grid[gz][gx];
+      if(c==='#'){ g.fillStyle = wallCss; }
+      else if(c==='D'){
+        const d = world.doors.get(gx+','+gz);
+        g.fillStyle = (d.state==='open') ? 'rgba(40,60,50,0.85)' : accCss;
+      }
+      else if(c==='S'){
+        const sec = world.secrets.get(gx+','+gz);
+        g.fillStyle = sec.opened ? 'rgba(40,60,50,0.85)' : wallCss; // keep secrets secret!
+      }
+      else g.fillStyle = 'rgba(30,42,60,0.8)';
+      g.fillRect(gx*s, gz*s, s, s);
+    }
+  }
+  // exit portal (gold, pulsing)
+  if(world.exit){
+    const egx = gOf(world.exit.x), egz = gOf(world.exit.z);
+    if(vis(egx,egz)){
+      const pulse = 2.4 + Math.sin(performance.now()/300)*1.0;
+      g.fillStyle = '#ffd766';
+      g.beginPath(); g.arc(egx*s+s/2, egz*s+s/2, pulse, 0, 7); g.fill();
+    }
+  }
+  // checkpoints
+  g.fillStyle = '#35e0c0';
+  for(const cp of world.checkpoints){
+    const cgx = gOf(cp.x), cgz = gOf(cp.z);
+    if(vis(cgx,cgz)){ g.beginPath(); g.arc(cgx*s+s/2, cgz*s+s/2, 2.2, 0, 7); g.fill(); }
+  }
+  // pickups (tiny white)
+  g.fillStyle = 'rgba(255,255,255,0.85)';
+  for(const p of world.pickups){
+    const pgx = gOf(p.x), pgz = gOf(p.z);
+    if(vis(pgx,pgz)){ g.beginPath(); g.arc(pgx*s+s/2, pgz*s+s/2, 1.4, 0, 7); g.fill(); }
+  }
+  // Quizlings
+  g.fillStyle = enCss;
+  for(const en of world.enemies){
+    if(en.state==='caught') continue;
+    const egx = gOf(en.x), egz = gOf(en.z);
+    if(vis(egx,egz)){ g.beginPath(); g.arc(egx*s+s/2, egz*s+s/2, 2.4, 0, 7); g.fill(); }
+  }
+  // player arrow
+  const px = player.x/TILE*s, pz = player.z/TILE*s;
+  const ang = Math.atan2(-Math.cos(player.yaw), -Math.sin(player.yaw)); // heading in map space
+  g.save();
+  g.translate(px, pz); g.rotate(ang);
+  g.fillStyle = '#fff';
+  g.beginPath(); g.moveTo(5,0); g.lineTo(-3.5,3.2); g.lineTo(-3.5,-3.2); g.closePath(); g.fill();
+  g.restore();
+}
+
+/* ---------- HUD ---------- */
+function updateHUD(){
+  const h = document.getElementById('hearts');
+  let s = '';
+  for(let i=0;i<5;i++) s += `<span class="${i<state.hearts?'heartOn':'heartOff'}">&#10084;</span>`;
+  h.innerHTML = s;
+  document.getElementById('score').textContent = fmt(state.score);
+}
+function toast(msg, cls){
+  const t = document.createElement('div');
+  t.className = 'toast' + (cls?' '+cls:'');
+  t.innerHTML = msg;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(()=>{ t.style.opacity='0'; t.style.transition='opacity .4s'; }, 1800);
+  setTimeout(()=>t.remove(), 2300);
+}
+
+/* ---------- input ---------- */
+const keys = {};
+window.addEventListener('keydown', e => {
+  if(e.target && e.target.tagName === 'INPUT') return; // don't hijack typing in the name boxes
+  keys[e.code] = true;
+  if(e.code==='Space'){ e.preventDefault(); if(state.mode==='play') tryInteract(); }
+  if(e.code==='KeyZ' && state.mode==='play') throwPlayerBall();
+  if(e.code==='KeyM') toggleMusic();
+  if(state.mode==='quiz' && /^Digit[1-4]$/.test(e.code)){
+    const btn = document.querySelectorAll('#quizAnswers .ansBtn')[+e.code.slice(5)-1];
+    if(btn && !btn.disabled) btn.click();
+  }
+});
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+document.getElementById('musicBtn').addEventListener('click', e => { e.stopPropagation(); toggleMusic(); });
+canvas.addEventListener('click', () => {
+  if(state.mode==='play' && document.pointerLockElement !== canvas)
+    canvas.requestPointerLock();
+});
+document.addEventListener('mousemove', e => {
+  if(document.pointerLockElement === canvas && state.mode==='play'){
+    player.yaw   -= e.movementX * 0.0023;
+    player.pitch -= e.movementY * 0.0019;
+    player.pitch = Math.max(-0.45, Math.min(0.45, player.pitch));
+  }
+});
+document.addEventListener('pointerlockchange', () => {
+  if(document.pointerLockElement !== canvas && state.mode==='play'){
+    state.mode = 'pause';
+    document.getElementById('pauseOverlay').classList.add('show');
+  }
+});
+document.getElementById('resumeBtn').addEventListener('click', () => {
+  document.getElementById('pauseOverlay').classList.remove('show');
+  state.mode = 'play';
+  canvas.requestPointerLock();
+});
+
+/* ---------- doors & secrets ---------- */
+function nearestOf(map, maxDist){
+  let best=null, bd=maxDist;
+  for(const o of map.values()){
+    const d = Math.hypot(tx(o.gx)-player.x, tz(o.gz)-player.z);
+    if(d<bd){ bd=d; best=o; }
+  }
+  return best;
+}
+function tryInteract(){
+  const door = nearestOf(world.doors, 6.2);
+  if(door){
+    if(door.state==='closed' || door.state==='closing'){ door.state='opening'; sfx.door(); }
+    else if(door.state==='open' || door.state==='opening'){
+      // don't close on top of someone
+      const occ = (gOf(player.x)===door.gx && gOf(player.z)===door.gz) ||
+        world.enemies.some(en => gOf(en.x)===door.gx && gOf(en.z)===door.gz);
+      if(occ){ toast('Something is in the doorway!','bad'); return; }
+      door.state='closing'; sfx.door();
+    }
+    return;
+  }
+  const sec = nearestOf(world.secrets, 6.2);
+  if(sec && !sec.opened && sec.prog===0){
+    sec.opening = true; sfx.secret();
+    state.stats.secrets++;
+    toast('&#10024; Secret passage discovered!','gold');
+  }
+}
+function updateDoors(dt){
+  for(const d of world.doors.values()){
+    if(d.state==='opening'){
+      d.prog = Math.min(1, d.prog + dt/0.7);
+      if(d.prog>=1) d.state='open';
+    } else if(d.state==='closing'){
+      d.prog = Math.max(0, d.prog - dt/0.7);
+      if(d.prog<=0) d.state='closed';
+    }
+    d.mesh.position.y = d.baseY + d.prog * (WALLH*0.92);
+  }
+  for(const s of world.secrets.values()){
+    if(s.opening && !s.opened){
+      s.prog = Math.min(1, s.prog + dt/1.1);
+      s.mesh.position.y = WALLH/2 - s.prog * (WALLH*0.97);
+      if(s.prog>=1){ s.opened = true; }
+    }
+  }
+  // interaction hint
+  const hint = document.getElementById('hint');
+  if(state.mode==='play'){
+    const d = nearestOf(world.doors, 6.2);
+    if(d){ hint.style.display='block';
+      hint.textContent = (d.state==='closed'||d.state==='closing') ? 'SPACE — open door' : 'SPACE — close door'; }
+    else {
+      const s = nearestOf(world.secrets, 5.0);
+      if(s && !s.opened && Math.random) hint.style.display = 'none';
+      hint.style.display = 'none';
+    }
+  } else hint.style.display='none';
+}
+
+/* ---------- player movement ---------- */
+function updatePlayer(dt){
+  const turn = 2.4*dt;
+  const shift = keys['ShiftLeft'] || keys['ShiftRight'];
+  if(!shift){
+    if(keys['ArrowLeft'])  player.yaw += turn;
+    if(keys['ArrowRight']) player.yaw -= turn;
+  }
+  let fwd=0, str=0;
+  if(keys['KeyW']||keys['ArrowUp']) fwd += 1;
+  if(keys['KeyS']||keys['ArrowDown']) fwd -= 1;
+  if(keys['KeyA'] || (shift && keys['ArrowLeft']))  str -= 1;
+  if(keys['KeyD'] || (shift && keys['ArrowRight'])) str += 1;
+  if(fwd||str){
+    const len = Math.hypot(fwd,str); fwd/=len; str/=len;
+    const sin = Math.sin(player.yaw), cos = Math.cos(player.yaw);
+    const vx = (sin*-fwd + cos*str) * player.speed * dt;
+    const vz = (cos*-fwd - sin*str) * player.speed * dt;
+    if(canStand(player.x+vx, player.z, player.r)) player.x += vx;
+    if(canStand(player.x, player.z+vz, player.r)) player.z += vz;
+  }
+  camera.position.set(player.x, EYE, player.z);
+  camera.rotation.order = 'YXZ';
+  camera.rotation.y = player.yaw;
+  camera.rotation.x = player.pitch;
+}
+
+/* ---------- pickups / checkpoints / exit ---------- */
+function updatePickups(dt, now){
+  for(let i=world.pickups.length-1; i>=0; i--){
+    const p = world.pickups[i];
+    p.t += dt;
+    p.mesh.rotation.y += dt*1.4;
+    p.mesh.position.y = 1.0 + Math.sin(p.t*2.4)*.18;
+    if(Math.hypot(p.x-player.x, p.z-player.z) < 1.8){
+      if(p.type==='H'){
+        if(state.hearts<5){ state.hearts++; sfx.heart(); toast('&#10084; Extra chance!','good'); }
+        else { state.score+=100; sfx.pickup(); toast('Health full — +100 points!','gold'); }
+      } else {
+        const def = PICKUP_DEFS[p.type];
+        state.score += def.points; state.stats.treasures++;
+        sfx.pickup(); toast(`+${def.points} — ${def.name}!`,'gold');
+      }
+      scene.remove(p.mesh);
+      world.pickups.splice(i,1);
+      updateHUD();
+    }
+  }
+  for(const cp of world.checkpoints){
+    cp.ring.rotation.z += dt*.8;
+    if(Math.hypot(cp.x-player.x, cp.z-player.z) < 2.1){
+      if(state.respawn.x!==cp.x || state.respawn.z!==cp.z){
+        state.respawn = { x:cp.x, z:cp.z, yaw:player.yaw };
+        sfx.checkpoint(); toast('&#128190; Checkpoint saved!','good');
+      }
+    }
+  }
+  if(world.exit){
+    world.exit.portal.rotation.y += dt*1.6;
+    const unlocked = state.stats.caught >= 3;
+    world.exit.portal.material.emissiveIntensity = unlocked ? .9 : .12;
+    if(Math.hypot(world.exit.x-player.x, world.exit.z-player.z) < 2.3){
+      if(unlocked) levelComplete();
+      else if(!world.lockMsgT || now - world.lockMsgT > 2.5){
+        world.lockMsgT = now;
+        toast('&#128274; Portal locked! Catch ' + (3-state.stats.caught) +
+          ' more Quizling' + (3-state.stats.caught>1?'s':'') + '! (' + state.stats.caught + '/3)','bad');
+      }
+    }
+  }
+}
+/* =========================================================
+   DATA LOGGING → GOOGLE SHEETS
+   Paste your Apps Script Web App URL between the quotes below.
+   If left empty, the game works normally and just skips logging.
+   ========================================================= */
+const SHEETS_URL = 'https://script.google.com/macros/s/AKfycbyEXllomJ4ovnN-crysn9i6NTBw3-HneCA_fHiZzGeDwzIUA_3z8zcOnDBcMs3XktfFpQ/exec';
+
+function sendData(event, extra){
+  if(!SHEETS_URL) return;
+  const s = state.stats;
+  const t = (world && world.totals) || { supplies:0, secrets:0, enemies:0 };
+  const missed = Object.entries(s.missed || {}).map(([k,v]) => k+' ×'+v).join('; ');
+  const payload = Object.assign({
+    name: state.playerName || '?',
+    cls: state.playerClass || '?',
+    event: event,
+    level: LEVELS[state.level].name,
+    score: state.score,
+    questions: s.questions,
+    correct: s.correct,
+    accuracy: s.questions ? Math.round(100*s.correct/s.questions) : 100,
+    supplies: s.treasures + ' / ' + t.supplies,
+    secrets: s.secrets + ' / ' + t.secrets,
+    caught: s.caught,
+    hearts: state.hearts,
+    mapMode: state.mapMode,
+    missed: missed
+  }, extra || {});
+  try{
+    fetch(SHEETS_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify(payload)
+    });
+  }catch(e){}
+}
+
+/* =========================================================
+   QUIZLINGS & QUESTION BALLS
+   ========================================================= */
+function updateEnemies(dt, now){
+  const L = LEVELS[state.level];
+  for(let i=world.enemies.length-1; i>=0; i--){
+    const en = world.enemies[i];
+    en.bobT += dt;
+    if(en.state==='caught'){
+      en.catchT += dt;
+      const k = Math.min(1, en.catchT/0.7);
+      en.mesh.scale.setScalar(1-k*0.99);
+      en.mesh.position.y = Math.sin(k*Math.PI)*1.6;
+      if(k>=1){ scene.remove(en.mesh); world.enemies.splice(i,1); }
+      continue;
+    }
+    const dx = player.x-en.x, dz = player.z-en.z;
+    const dist = Math.hypot(dx,dz);
+    // face the player when nearby
+    if(dist < 34) en.mesh.rotation.y = Math.atan2(dx,dz);
+    // waddle toward player, stop at a polite distance
+    if(dist < 30 && dist > 8){
+      const sp = 2.3*dt;
+      const nx = en.x + (dx/dist)*sp, nz = en.z + (dz/dist)*sp;
+      if(canStand(nx, en.z, en.r)) en.x = nx;
+      if(canStand(en.x, nz, en.r)) en.z = nz;
+    }
+    en.mesh.position.set(en.x, Math.abs(Math.sin(en.bobT*7))*.18, en.z);
+    // billboard + walk-cycle animation
+    if(en.mesh.__isSprite){
+      faceCamera(en.mesh);
+      const moving = dist < 30 && dist > 8;
+      if(moving){
+        const fps = 8;
+        const frame = Math.floor(en.bobT * fps) % en.mesh.__spriteObj.def[4];
+        const facingL = Math.sin(en.mesh.rotation.y) < 0;
+        updateSpriteFrame(en.mesh.__spriteObj, frame, facingL);
+      }
+    }
+    // throw a question ball
+    en.cool -= dt;
+    if(en.cool<=0 && dist>3.5 && dist<27 && hasLOS(en.x,en.z,player.x,player.z) && state.mode==='play'){
+      en.cool = 4.5 + Math.random()*3;
+      const ball = buildQuestionBall(L.biome.accent);
+      const ox = en.x, oz = en.z, oy = 1.6;
+      ball.position.set(ox, oy, oz);
+      scene.add(ball);
+      const tdx = player.x-ox, tdz = player.z-oz, tdy = 1.4-oy;
+      const tl = Math.hypot(tdx, tdy, tdz), spd = 8.5;
+      world.balls.push({ mesh:ball, enemy:en,
+        vx:tdx/tl*spd, vy:tdy/tl*spd, vz:tdz/tl*spd, friendly:false, life:6 });
+      sfx.throwBall();
+    }
+  }
+  // Final Floor: Quizlings regenerate ~10s after the last one is caught
+  if(world.boss){
+    if(world.enemies.length === 0){
+      world.regenT -= dt;
+      if(world.regenT <= 0){
+        for(const s of world.eSpawns) spawnEnemy(s.x, s.z);
+        world.regenT = 10;
+        toast('&#10024; More Quizlings arrive — grab their balls!','gold');
+      }
+    } else world.regenT = 10;
+  }
+}
+
+/* ---------- THE QUIZZARD (final boss) ---------- */
+function bossCanStand(x,z,r){
+  for(const dx of [-r,r]) for(const dz of [-r,r]){
+    const gx = gOf(x+dx), gz2 = gOf(z+dz);
+    const c = cellAt(gx, gz2);
+    if(c==='#') return false;
+    if(c==='S' && !world.secrets.get(gx+','+gz2).opened) return false;
+    // closed doors do NOT stop the Quizzard — he follows you everywhere
+  }
+  return true;
+}
+function updateBoss(dt, now){
+  const b = world.boss;
+  if(!b || b.state==='dead') return;
+  b.bobT += dt;
+  if(b.state==='dying'){
+    b.catchT += dt;
+    const k = Math.min(1, b.catchT/1.2);
+    b.mesh.scale.setScalar(1.55*(1-k*0.99));
+    b.mesh.position.y = Math.sin(k*Math.PI)*2.5;
+    b.mesh.rotation.y += dt*9;
+    if(k>=1){
+      scene.remove(b.mesh);
+      b.state = 'dead';
+      updateBossHUD();
+      state.score += 1000;
+      updateHUD();
+      toast('&#128081; +1000 — THE QUIZZARD IS DEFEATED!','gold');
+      setTimeout(levelComplete, 900);
+    }
+    return;
+  }
+  if(b.hitT > 0){ b.hitT -= dt; b.mesh.scale.setScalar(1.55*(1 + Math.max(0,Math.sin(b.hitT*40))*.09)); }
+  const dx = player.x-b.x, dz = player.z-b.z;
+  const dist = Math.hypot(dx,dz);
+  b.mesh.rotation.y = Math.atan2(dx,dz);
+  if(dist > 5.5){
+    const sp = 3.1*dt;
+    const nx = b.x + dx/dist*sp, nz = b.z + dz/dist*sp;
+    if(bossCanStand(nx, b.z, 1.3)) b.x = nx;
+    if(bossCanStand(b.x, nz, 1.3)) b.z = nz;
+  }
+  b.mesh.position.set(b.x, Math.abs(Math.sin(b.bobT*5))*.25, b.z);
+  if(b.mesh.__isSprite){
+    faceCamera(b.mesh);
+    const runDef = b.mesh.__bossRunDef;
+    const isChasing = dist > 5.5;
+    const activeDef = isChasing ? runDef : b.mesh.__spriteObj.def;
+    // switch def if mode changes
+    if(b.mesh.__spriteObj.def !== activeDef){
+      b.mesh.__spriteObj.def = activeDef;
+    }
+    const fps = isChasing ? 10 : 6;
+    const nf = activeDef[4];
+    const frame = Math.floor(b.bobT * fps) % nf;
+    const facingL = Math.sin(b.mesh.rotation.y) < 0;
+    updateSpriteFrame(b.mesh.__spriteObj, frame, facingL);
+  }
+  b.cool -= dt;
+  if(b.cool<=0 && dist>3.5 && dist<32 && hasLOS(b.x,b.z,player.x,player.z) && state.mode==='play'){
+    b.cool = 2.6 + Math.random()*1.6;
+    const ball = buildQuestionBall(0xff4060);
+    ball.scale.setScalar(1.5);
+    ball.position.set(b.x, 2.4, b.z);
+    scene.add(ball);
+    const tdx = player.x-b.x, tdz = player.z-b.z, tdy = 1.4-2.4;
+    const tl = Math.hypot(tdx,tdy,tdz), spd = 10.5;
+    world.balls.push({ mesh:ball, bossBall:true, friendly:false,
+      vx:tdx/tl*spd, vy:tdy/tl*spd, vz:tdz/tl*spd, life:6 });
+    sfx.throwBall();
+  }
+}
+
+function updateBalls(dt, now){
+  for(let i=world.balls.length-1; i>=0; i--){
+    const b = world.balls[i];
+    b.mesh.rotation.x += dt*6; b.mesh.rotation.y += dt*4;
+    b.life -= dt;
+    b.mesh.position.x += b.vx*dt;
+    b.mesh.position.y += b.vy*dt;
+    b.mesh.position.z += b.vz*dt;
+    const hitWall = isSolid(gOf(b.mesh.position.x), gOf(b.mesh.position.z));
+    if(b.life<=0 || hitWall){
+      if(b.friendly && hitWall) toast('Missed! The ball hit a wall.','bad');
+      scene.remove(b.mesh); world.balls.splice(i,1); continue;
+    }
+    if(b.friendly){
+      // player's throw: hits the Quizzard?
+      if(world.boss && world.boss.state==='chase'){
+        const bd = Math.hypot(b.mesh.position.x-world.boss.x, b.mesh.position.z-world.boss.z);
+        if(bd < 2.6){
+          world.boss.hp--; world.boss.hitT = .5;
+          state.score += 250; updateHUD(); updateBossHUD();
+          sfx.catchBall();
+          if(world.boss.hp <= 0){
+            world.boss.state = 'dying'; world.boss.catchT = 0;
+            toast('&#127919; FINAL HIT!','gold');
+          } else {
+            toast('&#127919; Direct hit! ' + world.boss.hp + ' more to go! +250','good');
+          }
+          scene.remove(b.mesh); world.balls.splice(i,1);
+          continue;
+        }
+      }
+      // player's throw: tag any Quizling it touches
+      let hit = false;
+      for(const en of world.enemies){
+        if(en.state==='caught') continue;
+        const d = Math.hypot(b.mesh.position.x-en.x, b.mesh.position.z-en.z);
+        if(d < 1.5 && b.mesh.position.y > -0.5 && b.mesh.position.y < 3.2){
+          en.state = 'caught';
+          state.stats.caught++;
+          state.score += 150;
+          sfx.catchBall();
+          toast('&#127919; Caught! The Quizling vanishes! +150','good');
+          updateHUD();
+          hit = true;
+          break;
+        }
+      }
+      if(hit){ scene.remove(b.mesh); world.balls.splice(i,1); }
+      continue;
+    }
+    // enemy ball: hits the player → quiz time (boss balls can't be absorbed!)
+    const dp = Math.hypot(b.mesh.position.x-player.x, b.mesh.position.z-player.z);
+    if(dp < (b.bossBall ? 1.5 : 1.25) && now > state.invulnUntil && state.mode==='play'){
+      if(b.bossBall){
+        scene.remove(b.mesh); world.balls.splice(i,1);
+        state.hearts--; updateHUD(); sfx.wrong();
+        state.invulnUntil = now + 2.2;
+        if(state.hearts <= 0){ whiteOut(); return; }
+        toast('&#128165; You can&#700;t absorb the Quizzard&#700;s ball! -1 chance','bad');
+        continue;
+      }
+      startQuiz(b);
+      return;
+    }
+  }
+}
+
+/* ---------- player throw (Z) ---------- */
+function throwPlayerBall(){
+  if(!world || state.ammo<=0) return;
+  state.ammo--;
+  updateAmmoHUD();
+  const L = LEVELS[state.level];
+  const ball = buildQuestionBall(L.biome.accent);
+  const dir = new THREE.Vector3();
+  camera.getWorldDirection(dir);
+  ball.position.set(player.x + dir.x*1.0, EYE - 0.15 + dir.y, player.z + dir.z*1.0);
+  scene.add(ball);
+  const spd = 19;
+  world.balls.push({ mesh:ball, friendly:true, vx:dir.x*spd, vy:dir.y*spd, vz:dir.z*spd, life:4 });
+  sfx.throwBall();
+}
+function updateAmmoHUD(){
+  const box = document.getElementById('ammoBox');
+  if(state.ammo > 0){
+    box.style.display = 'block';
+    box.innerHTML = `&#9679; ×${state.ammo} &nbsp;<span style="color:#fff;font-weight:600;">press <span class="key">Z</span> to throw!</span>`;
+    document.getElementById('crosshair').style.background = '#ffd766';
+  } else {
+    box.style.display = 'none';
+    document.getElementById('crosshair').style.background = 'rgba(255,255,255,0.85)';
+  }
+}
+
+/* =========================================================
+   QUIZ FLOW
+   ========================================================= */
+let activeBall = null, activeQ = null;
+function startQuiz(ball){
+  state.mode = 'quiz';
+  activeBall = ball;
+  activeQ = deck.draw();
+  state.stats.questions++; state.totalQuestions++;
+  if(document.pointerLockElement === canvas) document.exitPointerLock();
+
+  document.getElementById('quizTag').textContent = 'STANDARD ' + activeQ.std;
+  const pass = document.getElementById('quizPassage');
+  if(activeQ.passage){
+    pass.style.display='block';
+    pass.innerHTML = activeQ.passage.replace(/\n/g,'<br>');
+  } else pass.style.display='none';
+  document.getElementById('quizQ').textContent = activeQ.q;
+  document.getElementById('quizFeedback').textContent = '';
+  const wrap = document.getElementById('quizAnswers');
+  wrap.innerHTML = '';
+  activeQ.choices.forEach((c, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'ansBtn';
+    btn.innerHTML = `<span class="key">${idx+1}</span> ${c}`;
+    btn.addEventListener('click', () => answer(idx, btn));
+    wrap.appendChild(btn);
+  });
+  document.getElementById('quizWrap').style.display = 'flex';
+}
+
+function answer(idx, btn){
+  const btns = document.querySelectorAll('#quizAnswers .ansBtn');
+  btns.forEach(b => b.disabled = true);
+  const fb = document.getElementById('quizFeedback');
+  const correct = (idx === activeQ.a);
+  btns[activeQ.a].classList.add('correct');
+  if(correct){
+    sfx.correct();
+    state.stats.correct++; state.totalCorrect++;
+    state.score += 100;
+    fb.innerHTML = '<span style="color:#7dff9b">Correct! +100 — you grabbed the ball! Press <b>Z</b> to throw it back!</span>';
+    addContinueBtn(() => {
+      if(activeBall){
+        scene.remove(activeBall.mesh);
+        const bi = world.balls.indexOf(activeBall); if(bi>=0) world.balls.splice(bi,1);
+        activeBall.enemy.cool = 3.5 + Math.random()*2;
+      }
+      state.ammo++;
+      updateAmmoHUD();
+      closeQuiz();
+      toast('&#9679; Ball grabbed — press Z to throw it!','gold');
+    });
+  } else {
+    sfx.wrong();
+    state.stats.missed[activeQ.std] = (state.stats.missed[activeQ.std] || 0) + 1;
+    btn.classList.add('wrong');
+    fb.innerHTML = '<span style="color:#ff6b6b">Not quite — the answer is highlighted in green.</span>';
+    addContinueBtn(() => {
+      state.hearts--;
+      updateHUD();
+      if(activeBall){ scene.remove(activeBall.mesh);
+        const bi = world.balls.indexOf(activeBall); if(bi>=0) world.balls.splice(bi,1);
+        activeBall.enemy.cool = 4 + Math.random()*2;
+      }
+      if(state.hearts <= 0){ closeQuiz(false); whiteOut(); }
+      else { closeQuiz(); toast('&#128148; Lost a chance!','bad'); }
+    });
+  }
+}
+function addContinueBtn(fn){
+  const fb = document.getElementById('quizFeedback');
+  const b = document.createElement('button');
+  b.className = 'bigBtn'; b.style.fontSize='16px'; b.style.padding='10px 30px'; b.style.marginTop='10px';
+  b.textContent = 'Continue ▶';
+  b.addEventListener('click', fn);
+  fb.appendChild(document.createElement('br'));
+  fb.appendChild(b);
+}
+function closeQuiz(relock=true){
+  document.getElementById('quizWrap').style.display = 'none';
+  state.invulnUntil = performance.now()/1000 + 2.5;
+  activeBall = null;
+  state.mode = 'play';
+  if(relock) canvas.requestPointerLock();
+}
+
+/* ---------- losing all chances: fade to white, respawn ---------- */
+function whiteOut(){
+  state.mode = 'dead';
+  sendData('Lost All Chances');
+  if(document.pointerLockElement === canvas) document.exitPointerLock();
+  const f = document.getElementById('fadeWhite');
+  f.style.opacity = '1';
+  setTimeout(() => {
+    // respawn at last save point
+    player.x = state.respawn.x; player.z = state.respawn.z; player.yaw = state.respawn.yaw;
+    state.hearts = 5;
+    for(const b of world.balls) scene.remove(b.mesh);
+    world.balls.length = 0;
+    for(const en of world.enemies) en.cool = Math.max(en.cool, 3);
+    updateHUD();
+    f.style.opacity = '0';
+    state.invulnUntil = performance.now()/1000 + 3;
+    setTimeout(() => {
+      state.mode = 'pause';
+      document.getElementById('pauseOverlay').classList.add('show');
+      toast('Back at your save point — you’ve got this!','good');
+    }, 700);
+  }, 1300);
+}
+
+/* =========================================================
+   LEVEL TRANSITIONS (Wolfenstein-style tally screen)
+   ========================================================= */
+function levelComplete(){
+  if(state.mode!=='play') return;
+  state.mode = 'transition';
+  sendData(world.boss ? 'Boss Defeated' : 'Level Complete');
+  sfx.portal();
+  if(document.pointerLockElement === canvas) document.exitPointerLock();
+  const s = state.stats, t = world.totals;
+  const pc = (a,b) => b ? Math.min(100, Math.round(100*a/b)) : 100;
+  const card = (num, lbl, sub, pct) => `
+    <div class="statCard">
+      <div class="statNum">${num}</div>
+      <div class="statLbl">${lbl}</div>
+      ${sub !== null ? `<div class="statSub">${sub}</div>` : ''}
+      ${pct !== null ? `<div class="statBar"><div style="width:${pct}%"></div></div>` : ''}
+    </div>`;
+  const qPct = pc(s.correct, s.questions);
+  const supPct = pc(s.treasures, t.supplies);
+  const secPct = pc(s.secrets, t.secrets);
+  const quizPct = pc(s.caught, t.enemies);
+  document.getElementById('ldTitle').textContent = world.boss ? 'THE QUIZZARD IS DEFEATED!' : 'BIOME CLEARED!';
+  document.getElementById('ldSub').textContent = LEVELS[state.level].name;
+  document.getElementById('statGrid').innerHTML =
+    card(fmt(state.score), 'SCORE', '&nbsp;', null) +
+    card(qPct+'%', 'QUESTIONS', `${s.correct} of ${s.questions} correct`, qPct) +
+    card(supPct+'%', 'SUPPLIES FOUND', `${s.treasures} of ${t.supplies}`, supPct) +
+    card(secPct+'%', 'SECRETS FOUND', `${s.secrets} of ${t.secrets}`, secPct) +
+    card(quizPct+'%', 'QUIZLINGS CAUGHT', `${s.caught} of ${t.enemies}`, quizPct);
+  const btn = document.getElementById('nextLvlBtn');
+  btn.textContent = state.level < LEVELS.length-1 ? 'Next Biome ▶' : 'See Final Results ▶';
+  document.getElementById('levelDoneOverlay').classList.add('show');
+}
+document.getElementById('nextLvlBtn').addEventListener('click', () => {
+  document.getElementById('levelDoneOverlay').classList.remove('show');
+  if(state.level < LEVELS.length-1){
+    loadLevel(state.level+1);
+    state.mode = 'play';
+    canvas.requestPointerLock();
+  } else {
+    const pct = state.totalQuestions ? Math.round(100*state.totalCorrect/state.totalQuestions) : 100;
+    document.getElementById('winStats').innerHTML = `
+      <div id="statGrid" style="display:flex;gap:18px;justify-content:center;margin:18px 0 24px;flex-wrap:wrap;">
+        <div class="statCard"><div class="statNum">${fmt(state.score)}</div><div class="statLbl">FINAL SCORE</div></div>
+        <div class="statCard"><div class="statNum">${state.totalCorrect}/${state.totalQuestions}</div><div class="statLbl">QUESTIONS</div></div>
+        <div class="statCard"><div class="statNum">${pct}%</div><div class="statLbl">ACCURACY</div></div>
+      </div>`;
+    sendData('FINAL RESULTS — Whole Game', {
+      level: 'All 6 Floors',
+      questions: state.totalQuestions,
+      correct: state.totalCorrect,
+      accuracy: pct
+    });
+    state.mode = 'win';
+    document.getElementById('winOverlay').classList.add('show');
+  }
+});
+
+/* =========================================================
+   BOOT & MAIN LOOP
+   ========================================================= */
+document.getElementById('startBtn').addEventListener('click', () => {
+  const nm = document.getElementById('playerName').value.trim();
+  const cl = document.getElementById('playerClass').value.trim();
+  if(!nm || !cl){
+    document.getElementById('loginMsg').textContent = 'Please type your name AND your class before starting!';
+    return;
+  }
+  state.playerName = nm;
+  state.playerClass = cl;
+  startMusic();
+  document.getElementById('startOverlay').classList.remove('show');
+  loadLevel(0);
+  state.score = 0; state.totalCorrect = 0; state.totalQuestions = 0;
+  updateHUD();
+  state.mode = 'play';
+  canvas.requestPointerLock();
+});
+
+// Init cel shading and sprite loading
+initToonGradient();
+loadSprites();
+
+let lastT = performance.now();
+let mmAcc = 0;
+function tick(){
+  requestAnimationFrame(tick);
+  const nowMs = performance.now();
+  const dt = Math.min(0.05, (nowMs-lastT)/1000);
+  lastT = nowMs;
+  if(!scene) return;
+  const now = nowMs/1000;
+  if(state.mode==='play'){
+    updatePlayer(dt);
+    updateDoors(dt);
+    updatePickups(dt, now);
+    updateEnemies(dt, now);
+    updateBoss(dt, now);
+    updateBalls(dt, now);
+  } else {
+    // gentle idle animation behind overlays
+    camera.position.set(player.x, EYE, player.z);
+    camera.rotation.order='YXZ'; camera.rotation.y = player.yaw; camera.rotation.x = player.pitch;
+  }
+  mmAcc += dt;
+  if(world && mmAcc > 0.1){
+    if(state.mode==='play') revealAround();
+    drawMinimap();
+    mmAcc = 0;
+  }
+  renderer.render(scene, camera);
+}
+tick();
+
+/* ---------- easy / hard map mode picker ---------- */
+const modeEasyBtn = document.getElementById('modeEasy');
+const modeHardBtn = document.getElementById('modeHard');
+function setMapMode(m){
+  state.mapMode = m;
+  modeEasyBtn.classList.toggle('sel', m==='easy');
+  modeHardBtn.classList.toggle('sel', m==='hard');
+}
+modeEasyBtn.addEventListener('click', () => setMapMode('easy'));
+modeHardBtn.addEventListener('click', () => setMapMode('hard'));
+
+</script>
+</body>
+</html>

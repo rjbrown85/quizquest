@@ -1,0 +1,58 @@
+{
+  "quizlings": {
+    "green": {
+      "sheet": "sprites/quizlings.png",
+      "frames": 6,
+      "x": 0,
+      "y": 18,
+      "w": 117,
+      "h": 177,
+      "row_y": 18
+    },
+    "white": {
+      "sheet": "sprites/quizlings.png",
+      "frames": 6,
+      "x": 704,
+      "y": 18,
+      "w": 117,
+      "h": 177,
+      "row_y": 18
+    },
+    "desert": {
+      "sheet": "sprites/quizlings.png",
+      "frames": 3,
+      "x": 936,
+      "y": 215,
+      "w": 157,
+      "h": 315,
+      "row_y": 215
+    },
+    "lava": {
+      "sheet": "sprites/quizlings.png",
+      "frames": 6,
+      "x": 0,
+      "y": 545,
+      "w": 234,
+      "h": 218,
+      "row_y": 545
+    }
+  },
+  "boss": {
+    "walk": {
+      "sheet": "sprites/boss.png",
+      "frames": 5,
+      "x": 0,
+      "y": 0,
+      "w": 281,
+      "h": 384
+    },
+    "run": {
+      "sheet": "sprites/boss.png",
+      "frames": 4,
+      "x": 0,
+      "y": 384,
+      "w": 352,
+      "h": 384
+    }
+  }
+}
